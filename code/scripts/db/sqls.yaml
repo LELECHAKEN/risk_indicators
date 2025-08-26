@@ -1,0 +1,1556 @@
+﻿# sql to get factors from DW database
+ashare_calendar:
+  Sql: "SELECT * FROM jydb.QT_TRADINGDAYNEW
+                            where secumarket = '83'
+                            and IfTradingDay = '1'
+                            and tradingdate between to_date({beg_date}, 'yyyymmdd')
+                            and to_date({end_date}, 'yyyymmdd')
+                            order by tradingdate"
+
+
+dws_ptfpos_detail:
+ Sql: "select distinct * from dwd_ptfl_position_detail where c_date = '%s'"
+
+dws_ptfpos_detail_pre:
+ Sql: "select * from dwd_ptfl_position_detail_pre where c_date = '{t}'
+       and natural_date in (select max(natural_date) from dwd_ptfl_position_detail_pre where c_date = '{t}')"
+
+dws_ptfval_nav:
+  Sql: "SELECT C_DATE, PORTFOLIO_CODE, FULL_NAME, NAV, ACCU_NAV AS nav_cum
+        FROM DWS_PTFL_VALUATION_INDEX
+        WHERE C_DATE = '%s' AND IS_MAIN_SHARE = '是' "
+
+dws_ptfval_ret:
+ Sql: "SELECT to_date(t1.c_date, 'YYYY-MM-DD') AS d_date, t2.C_FUNDNAME, t1.NAV_GWT_RATE_D AS ret_daily_val
+       FROM DWS_PTFL_VALUATION_INDEX t1
+       LEFT JOIN portfolio_type t2
+       ON t1.PORTFOLIO_CODE = t2.C_FUNDCODE
+       WHERE t1.c_date = '%s' AND t1.IS_MAIN_SHARE = '是'
+       and t1.portfolio_code not in ('SJ2100.SMA')"
+
+tn_portfolio:
+ Sql: "select portfolio_code, cast(substr(valuation_method, 5, 1) as integer) as n_days
+       from tn_portfolioinfo"
+
+tn_portfolio_name:
+ Sql: "select t2.c_fundname, cast(substr(valuation_method, 5, 1) as integer) as n_days
+       from tn_portfolioinfo t1
+       left join portfolio_type t2 on t1.portfolio_code = t2.c_fundcode"
+
+bonus_val:
+ Sql: "SELECT C_DATE, PORTFOLIO_CODE, FULL_NAME, ACCU_DIVI_AMT AS bonus
+       FROM DWS_PTFL_VALUATION_INDEX
+       WHERE c_date = '%s' AND IS_MAIN_SHARE = '是'"
+
+dividend_info:
+  Sql: "select * from dpe_dividend"
+
+nav_check:
+  Sql: "select count(*) as total_num from dpe_portfolionav where d_date = date'%s'"
+
+return_check:
+  Sql: "select * from dpe_nav_check where d_date = '%s'"
+
+dpe_spread_ad:
+  Sql: "select * from DPE_SPREAD_AD"
+
+dpe_industry_id:
+  Sql: "select * from DPE_SPREADIND_MAP"
+
+dpe_curve_map:
+  Sql: "select * from DPE_YIELDCURVE_MAP"
+
+portfolio_nav:
+ Sql: "SELECT t1.*, t2.nav_cum
+       FROM
+       (SELECT C_DATE as d_date, PORTFOLIO_CODE, NAV
+        FROM DWS_PTFL_VALUATION_INDEX
+        WHERE C_DATE = '{t}' AND data_level = '产品') t1
+       LEFT JOIN
+       (SELECT PORTFOLIO_CODE, accu_nav as nav_cum
+        FROM DWS_PTFL_VALUATION_INDEX
+        WHERE C_DATE = '{t}' AND IS_MAIN_SHARE = '是') t2
+        ON t1.portfolio_code = t2.portfolio_code"
+
+nav_data:
+  Sql: "select C_FUNDNAME, D_DATE, NAV, RETURN, NAV_ADJ from DPE_PORTFOLIONAV
+        where C_FUNDNAME in (%s)
+        order by C_FUNDNAME, D_DATE"
+
+nav_data_t:
+  Sql: "select portfolio_code, C_FUNDNAME, D_DATE, Nav, NAV_ADJ
+        from DPE_PORTFOLIONAV
+        where D_DATE = date'%s' order by C_FUNDNAME, D_DATE"
+
+dws_main_asset:
+ Sql: "SELECT t1.*, t2.total_shares FROM
+       (SELECT c_date, portfolio_code, net_asset, total_asset, cash + term_and_otr_deposit AS deposit,
+        stock, convertible, bond + cd AS bond, abs, fund, repo_reverse, (-1) * repo as repo,
+        stock_future_fl + bond_future_fl + irs_fl + crmw AS derivatives
+        FROM DWS_PTFL_MAIN_ASSET_SUMY_F WHERE C_DATE = '{t}') t1
+       LEFT JOIN
+       (SELECT c_date, portfolio_code, total_shares FROM DWS_PTFL_VALUATION_INDEX
+        WHERE C_DATE = '{t}' AND DATA_LEVEL = '产品') t2
+       ON t1.c_date = t2.c_date AND t1.portfolio_code = t2.portfolio_code"
+
+inner_municipal:
+ Sql: "select DISTINCT 债项代码 AS code, CASE WHEN 行业二级名称 = '城投' THEN '是' ELSE '否' END AS MUNICIPALBOND
+       from crds_vw_evaluation_d_rating_n
+       where 评级生效日期 <= '{t}' and 评级失效日期 >= '{t}'"
+
+
+sold_out_secs:
+  Sql: "SELECT * FROM CRDS_VW_EVALUATION_D_RATING
+        where 处置建议 in ('择机卖出', '立即卖出')
+        and 评级状态 = '当前有效'"
+
+drawdown_mkt:
+  Sql: "select C_FUNDNAME, D_DATE, FUNDTYPE, TYPE, TYPE_L1, TYPE_L2, TYPE_L3, MANAGER, \"NetAsset\", \"DrawDown\", \"DrawDown_dura\", \"avgDuration_port\", CBOND from RC_MR_RETURN 
+        left join RC_STYLE using (C_FUNDNAME, D_DATE) left join RC_MR_HOLDING using (C_FUNDNAME, D_DATE) 
+        where D_DATE = '%s'"
+
+liq_warning:
+  Sql: "select C_FUNDNAME, D_DATE, FUNDTYPE, TYPE, TYPE_L1, TYPE_L2, TYPE_L3, MANAGER, MATURITY, LOWLIQ_RATIO, LOWLIQ_SECS from RC_LIQUIDITY
+        left join RC_STYLE using (C_FUNDNAME, D_DATE) left join RC_MGMT_LOWLIQSECS using (C_FUNDNAME, D_DATE)
+        where D_DATE = '%s' and MATURITY <= 31 and MATURITY > 0 and LOWLIQ_RATIO > 0"
+
+contracttype:
+  Sql: "select a.contractcode, a.contractname, a.contractabbr, b.ms as contracttype
+        from jydb.fut_contractmain a, jydb.CT_SystemConst b
+        where contractcode in (%s) and b.lb = 1461 and a.contracttype = b.dm"
+
+asset_position:
+  Sql: "select C_FUNDNAME, D_DATE, stock*\"TotalAsset\"/\"NetAsset\"*100 as stock_pos, cbond*\"TotalAsset\"/\"NetAsset\"*100 as cbond_pos from rc_style
+          where C_FUNDNAME in (%s) and D_DATE >= '%s' and D_DATE <= '%s' order by C_FUNDNAME, D_DATE"
+
+cbond_basicinfo:
+  Sql: "with c1 as (select b.innercode as cbond_innercode， b.SecuCode as cbond_code, b.SecuAbbr as cbond_name, b.SecuMarket as cbond_market,
+                                                a.SecuCode as stk_code, a.SecuAbbr as stk_name, a.ListedDate as list_date,
+                                                a.ListedEndDate as list_enddate, a.TradeEndDate as trade_enddate, a.EndDate as maturity_date,
+                                                a.ConvTermStartDate as conv_startdate,
+                                                a.ConvTermEndDate as conv_enddate, a.StopConvDate as stop_conv_date
+                                                from jydb.BOND_CONBDBASICINFO a
+                                                inner join jydb.Bond_Code b
+                                                on a.innercode = b.innercode
+                                                and b.SecuCode in (%s))
+                            select c1.*, d.ActualIssueSize from c1 inner join jydb.Bond_ConBDIssue d
+                            on c1.cbond_innercode = d.innercode"
+
+cbond_basicinfo_field:
+  Sql: "with c1 as (select b.innercode as cbond_innercode， b.SecuCode as cbond_code, b.SecuAbbr as cbond_name, b.SecuMarket as cbond_market,
+                                                a.SecuCode as stk_code, a.SecuAbbr as stk_name, a.ListedDate as list_date,
+                                                a.ListedEndDate as list_enddate, a.TradeEndDate as trade_enddate, a.EndDate as maturity_date,
+                                                a.ConvTermStartDate as conv_startdate,
+                                                a.ConvTermEndDate as conv_enddate, a.StopConvDate as stop_conv_date
+                                                from jydb.BOND_CONBDBASICINFO a
+                                                inner join jydb.Bond_Code b
+                                                on a.innercode = b.innercode
+                                                {field}
+                                                )
+                            select c1.*, d.ActualIssueSize from c1 inner join jydb.Bond_ConBDIssue d
+                            on c1.cbond_innercode = d.innercode "
+
+cbond_call_clause:
+  Sql: "select b.innercode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name,
+                    a.CallType , a.CallStartDate, a.CallEndDate, a.CallLevel, a.CallConditionDay, a.CallReachDay, CallUnconvertAmount
+                    from jydb.Bond_ConBDCallInfo a
+                    inner join jydb.Bond_Code b
+                    on a.innercode = b.innercode
+                    and b.SecuCode in (%s)"
+
+cbond_remain_amount:
+  Sql: "SELECT b.innercode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name,
+                            b.SecuMarket, a.RemainingAmount, a.EndDate
+                            FROM jydb.BOND_CONBDCONVERTINFO a
+                            inner join jydb.Bond_Code b
+                            on a.innercode = b.innercode
+                            and b.SecuCode IN ({secs_temp_str})
+                            and to_char(a.EndDate, 'yyyyMMdd') >= {list_date_min}
+                            and to_char(a.EndDate, 'yyyyMMdd') <= {end_date}"
+
+cbond_turnover:
+  Sql: "SELECT b.InnerCode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name,
+                            b.SecuMarket, a.TurnoverRate, a.TurnoverVolume, a.TradingDay
+                            FROM jydb.Bond_ConBDExchangeQuote a
+                            inner join jydb.Bond_Code b
+                            on a.innercode = b.innercode
+                            and b.SecuCode IN ({secs_temp_str})
+                            and to_char(a.TradingDay, 'yyyyMMdd') >= {list_date_min}
+                            and to_char(a.TradingDay, 'yyyyMMdd') <= {end_date}"
+
+cbond_turnover_field:
+  Sql: "SELECT b.InnerCode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name,
+                            b.SecuMarket, a.TurnoverRate, a.TurnoverVolume, a.TradingDay
+                            FROM jydb.Bond_ConBDExchangeQuote a
+                            inner join jydb.Bond_Code b
+                            on a.innercode = b.innercode
+                            and a.TradingDay between to_date({beg_date}, 'yyyymmdd')
+                                and to_date({end_date}, 'yyyymmdd') {field}"
+
+cbond_deriv_indicators:
+  Sql: "SELECT b.InnerCode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name, b.SecuMarket as cbond_market,
+                                a.TradingDay, a.CBConvertValue, a.ConvertPremiumRate, a.SecuMarket as a_cbond_market
+                                FROM jydb.bond_cbderivnew a
+                                inner join jydb.Bond_Code b
+                                on a.innercode = b.innercode
+                                and b.SecuCode IN ({secs_temp_str})
+                                and to_char(a.TradingDay, 'yyyyMMdd') = {date}
+                                -- and a.SecuMarket in (83, 90)"
+cbond_exchg_quote:
+  Sql: "SELECT b.InnerCode as cbond_innercode, b.SecuCode as cbond_code, b.SecuAbbr as cbond_name,
+                            b.SecuMarket, a.TradingDay,
+                            a.ClosePrice as cbond_close, a.NewConvetPrice as convert_price, a.StockPrice as stk_price,
+                            a.ConvertPremiumRate, a.CBConvertValue
+                            FROM jydb.Bond_ConBDExchangeQuote a
+                            inner join jydb.Bond_Code b
+                            on a.innercode = b.innercode
+                            and b.SecuCode IN ({secs_temp_str})
+                            and to_char(a.TradingDay, 'yyyyMMdd') >= {list_date_min}
+                            and to_char(a.TradingDay, 'yyyyMMdd') <= {end_date}"
+
+cbond_redeem_announce:
+ Sql: "select b.secucode, b.secuabbr, a.InfoPublDate, a.CallPrice, a.CallRegDate from jydb.Bond_ConBDCallPutInfo a
+        inner join SECUMAIN b
+        on a.innercode = b.innercode
+        and a.optypesecond = 10101
+        and a.opprogress = 2
+        and a.IfOption = 1
+        order by a.InfoPublDate desc"
+
+bond_clause:
+  Sql: "SELECT t2.secucode, t2.secumarket, t1.optiontype as clause FROM bond_basicinfon t1 LEFT JOIN bond_code t2 ON t1.InnerCode = t2.InnerCode WHERE t2.secucode IN (%s)"
+
+bond_yield:
+  Sql: "SELECT	enddate, t2.secucode, t2.secumarket,  vpyield, vpaduration, VPConvexity, CredibilityCode, CredibilityDesc, YieldCode
+        FROM	bond_cbvaluationall t1	LEFT JOIN bond_code t2 ON t1.innercode = t2.innercode
+        WHERE	t2.secucode IN (%s)	AND CredibilityCode = 1 AND ENDDATE = DATE '%s'"
+
+bond_ptm_option:
+  Sql: "select enddate, secucode, secumarket, trueremainmaturity, credibilitycode, credibilitydesc, yieldcode
+        from bond_cbvaluationall t1 left join bond_code t2 on t1.innercode = t2.innercode
+        where t2.secucode in (%s) and yieldcode = 1 and enddate = date'%s'"
+
+bond_interest_chg:
+  Sql: "SELECT DISTINCT t3.secucode, t3.secumarket, t1.*, compoundmethod, intpaymentmethod, payinteresteffency, valuedate, valuedateper, valuedatenextper, interestthisyear
+                            FROM BOND_CASHFLOW t1 LEFT JOIN bond_interestrate t2 ON t1.innercode = t2.innercode AND t1.valuebegindate = t2.valuedateper AND t1.valueenddate = t2.valuedatenextper
+        	                RIGHT JOIN (SELECT INNERCODE, secucode, secumarket FROM BOND_CODE WHERE SECUCODE IN (%s)) t3 ON t1.innercode = t3.innercode"
+
+bond_repurchase:
+  Sql: "select t2.secucode, t2.secumarket, optype, ExpectedExerciseDate
+                            from BOND_CALLPUTINFO t1 LEFT JOIN bond_code t2 ON t1.maincode = t2.innercode
+                            WHERE t2.secucode IN (%s) and optype = %d"
+
+bond_cash_flow:
+  Sql: "SELECT t2.secucode, t2.secumarket,	t1.*
+                            FROM BOND_CASHFLOW t1
+                            RIGHT JOIN ( SELECT INNERCODE, secucode, secumarket FROM BOND_CODE WHERE SECUCODE IN (%s)) t2 ON t1.innercode = t2.innercode
+                            ORDER BY t1.innercode,	paymentdate"
+
+curve_yield_all:
+  Sql: "SELECT ENDDATE,YEARSTOMATURITY,YIELD FROM JYDB.BOND_CBYIELDCURVEALL WHERE CURVECODE in (%s) AND YIELDTYPECODE = 1 AND ENDDATE = DATE '%s' AND STEPTYPECODE =1"
+
+curve_yield_interval:
+  Sql: "SELECT ENDDATE,CURVECODE,YEARSTOMATURITY,YIELD FROM JYDB.BOND_CBYIELDCURVEALL
+  WHERE CURVECODE in (%s) AND YIELDTYPECODE = 1 AND ENDDATE >= DATE '%s' AND ENDDATE <= DATE '%s' AND STEPTYPECODE =1"
+
+curve_yield_interval_risk:
+  Sql: "SELECT ENDDATE,CURVECODE,YEARSTOMATURITY,YIELD FROM JY_BOND_CBYIELDCURVEALL
+  WHERE CURVECODE in (%s) AND YIELDTYPECODE = 1 AND ENDDATE >= DATE '%s' AND ENDDATE <= DATE '%s' AND STEPTYPECODE =1"
+
+stock_eval_indice:
+  Sql: "select t1.tradingday, secucode, SecuMarket, ListedSector, totalMV, pe, pb
+                            from LC_DINDICESFORVALUATION t1 left join secumain t2 on t1.innercode = t2.innercode
+                            WHERE t2.secucode IN (%s) and t1.tradingday = DATE '%s'"
+
+stock_market_mv:
+  Sql: "select t1.tradingday, SecuCode, SecuMarket, ListedSector, totalMV, pe, pb
+                        from LC_DINDICESFORVALUATION t1 left join secumain t2 on t1.innercode = t2.innercode
+                        where ListedSector in (%s) and t1.tradingday = date'%s'"
+
+bond_inner_rating:
+  Sql: "SELECT * FROM CRDS_VW_EVALUATION_M_RATING where \"评级状态\" = '当前有效'"
+
+rc_mr_holding_t:
+  Sql: "select * from rc_mr_holding where D_DATE = '%s'"
+
+rc_mr_holding_prod:
+  Sql: "select * from rc_mr_holding where C_FUNDNAME in (%s) and d_date >= '%s'"
+
+rc_mr_return_bch_t:
+  Sql: "select * from rc_mr_return_bch where D_DATE = '%s'"
+
+rc_derivt:
+  Sql: "select * from rc_derivt where D_DATE = '%s'"
+
+rc_series:
+  Sql: "select * from %s where D_DATE >= '%s' and D_DATE <= '%s'"
+
+rc_alert_cr:
+  Sql: "select * from rc_alert_cr where D_DATE = '%s'"
+
+benchmark_return:
+  Sql: "select * from benchmark_bb_fund"
+
+masterdata:
+  Sql: "select * from dpe_bdp_masterdata"
+
+lr_holding:
+  Sql: "select * from dpe_lr_holding where d_date = '%s'"
+
+asset_allocation_t:
+  Sql: "select distinct * from (select TO_DATE(C_DATE,'yyyy-mm-dd') as D_DATE, t1.*
+        from %s t1 where C_FULLNAME in (%s)) where D_DATE = date'%s' order by C_FULLNAME"
+
+asset_allocation_interval:
+  Sql: "select distinct * from (select TO_DATE(C_DATE,'yyyy-mm-dd') as D_DATE, t1.* from %s t1
+        where C_FULLNAME in (%s)) where D_DATE >= date'%s' and D_DATE <= date'%s' order by C_FULLNAME, D_DATE"
+
+bond_return_data:
+  Sql: "select c_fundname, c_date, sec_name as securityname, asset_adj as mktval_x, fund_adjust, r_hold_ytm+r_capital_gain as r_day, attri_hold_ytm + attri_capital_gain as attri_day,
+          r_hold_ytm, r_capital_gain, attri_hold_ytm ,attri_capital_gain
+        from ba_cm_detail t1
+        left join portfolio_type t2 on t1.full_name = t2.c_fullname
+        where c_fundname in (%s) and c_date >= '%s' and c_date <= '%s'"
+
+bond_attribution_aa:
+ Sql: "select c_fundname, c_date, sec_name as securityname, asset_adj as mktval_x, fund_adjust, ret_adj as r_day, attri_sec as attri_day
+       from %s t1 left join portfolio_type t2 on t1.full_name = t2.c_fullname
+       where c_fundname in (%s) and c_date >= '%s' and c_date <= '%s' and sec_type='bond'"
+
+port_return:
+  Sql: "select c_fundname, d_date, return as ret from dpe_portfolionav where c_fundname in (%s) and d_date >= date'%s' and d_date <= date'%s'"
+
+port_asset:
+  Sql: "select c_fundname, d_date, \"NetAsset\" as net_asset from rc_style where c_fundname in (%s) and d_date >= '%s' and d_date <= '%s'"
+
+campisi_factor:
+  Sql: "select c_fundname, t2.* from campisi_total t2
+        left join portfolio_type t1 on t1.c_fullname = t2.c_fullname
+        where c_fundname in (%s)"
+
+idc_repo_t:
+  Sql: "select t1.*, t2.c_fundname from dwd_ptfl_position_repo_o32 t1
+        left join portfolio_type t2 on t1.full_name = t2.c_fullname
+        where c_date = '%s' and repo_dir not in ('债券融入')"
+
+dpe_repo_t:
+  Sql: "select * from dpe_repoall where d_date = '%s'"
+
+dpe_levcost_t:
+  Sql: "select * from dpe_levcost where d_date = '%s'"
+
+idc_trade:
+  Sql: "SELECT t3.c_fundname, t1.*, t3.t_hold as amt_t, t3.t_hold_1 as amt_t_1, t3.attri_dm_day, t3.r_dm_day, t3.attri_cg_day, t3.r_cg_day, t3.mktval_x as bond_value, t3.mktval_y as port_bond, t3.bond_percent, t3.net_cnbd_x, t3.net_cnbd_y, t3.net_price_rm, t3.net_price_rd FROM idc_trade t1
+        left join(select * from campisi_bond_zh left join campisi_detail_zh using (C_FULLNAME, C_DATE, SECURITYNAME)
+        left join portfolio_type using (c_fullname) where c_fundname in (%s)) t3
+        on t1.sec_abbr = t3.securityname
+        where t1.portfolio_code in (select c_fundcode from portfolio_type where c_fundname in (%s))
+        and t1.c_date = t3.c_date
+        and t1.portfolio_code = t3.c_fundcode
+        and t1.c_date >= '%s' and entrust_direction in ('债券分销买入','债券买入', '债券卖出')"
+
+dpe_restricted_stock:
+  Sql: "select * from dpe_sdp_portfolio where (stop_info like '%%限售%%' or stop_info like '%%停牌%%') and c_date = '%s'"
+
+stock_holding_check:
+  Sql: "select * from dpe_sdp_portfolio where c_date = '%s'"
+
+latest_tradeday:
+  Sql: "select c_date from dpe_dp_tradeday_exchg where c_date <= '%s'"
+
+ptf_basicinfo:
+  Sql: "SELECT distinct PORTFOLIO_CODE, full_name FROM DIM_PROD_BASICINFO where c_date = '%s' AND SETUP_OR_NOT = '1'"
+
+duration_alert:
+  Sql: "select d_date, t2.c_fundcode, t1.c_fundname, t2.type_l0, t2.type_l2, t2.manager_master as manager, t1.\"avgDuration_port\", t3.* from rc_mr_holding t1
+         left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+         left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode
+         where d_date = '%s'"
+
+ptm_alert:
+  Sql: "select d_date, t2.c_fundcode, t1.c_fundname, t1.\"avgPtm\", t3.* from rc_mgmt_monetaryfund t1
+         left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+         left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode
+         where d_date = '%s'"
+
+drawdown_alert:
+  Sql: "select t1.d_date, t2.c_fundcode, t1.c_fundname, t2.type_l0, t2.type_l2, t2.manager, t1.maxdrawdown_oneyear, t1.drawdown_oneyear, t1.drawdown_dura_oneyear, t4.\"avgDuration_port\", t3.*
+        from rc_mr_maxdd t1
+        left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+        left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode
+        left join rc_mr_holding t4 on t1.c_fundname = t4.c_fundname and t1.d_date = t4.d_date
+        where t1.d_date = '%s'"
+
+calender_day_t:
+  Sql: "select d_date from tradeday where d_date <= date'%s' and c_flag = '%s'"
+
+nearest_tradeday:
+  Sql: "select max(d_date) from tradeday where d_date <= date'%s' and c_flag = '1'"
+
+winratio_alert:
+  Sql: "select t1.d_date, t2.c_fundcode, t1.c_fundname, t2.type_l0, t2.type_l2, t2.manager, t1.winratio_cnt, t3.*
+        from (select c_fundname, max(d_date) as d_date, sum(ret_cnt)/count(ret_cnt) as winratio_cnt from rc_mr_winratio
+              where d_date > '%s' and d_date <= '%s' group by c_fundname) t1
+        left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+        left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode"
+
+portfolio_type:
+  Sql: "select * from portfolio_type"
+
+
+var_yield:
+  sql: " select curvecode, YearsToMaturity, Yield from Bond_CBYieldCurveAll
+         where EndDate = date'{t}' and YieldType = '到期' and StepType = '标准待偿期'
+         and ((curvecode = 195 and YearsToMaturity in (0.25, 1, 3, 5, 10))
+               or (curvecode in (70, 66, 67) and YearsToMaturity in (0.25, 1, 3, 5)))
+         order by curvecode, YearsToMaturity"
+
+var_yield_qtl:
+  sql: "select * from rc_mr_var_yield_qtl"
+
+
+var_slope_qtl:
+  sql: "select * from rc_mr_var_slope_qtl"
+
+
+index_fund_nav:
+  sql: "SELECT F_INFO_WINDCODE, F_NAV_UNIT
+        FROM WINDDB.ChinaMutualFundNAV
+        WHERE F_INFO_WINDCODE IN {windcode} AND PRICE_DATE = {t}"
+
+
+index_fund_dev_days:
+  sql: "SELECT COUNT(CASE WHEN A_DEV > 0 THEN 1 END)/COUNT(*) AS DEVI_DAYS
+        FROM
+        (SELECT *  FROM RC_MR_INDEX_FUND_MONITOR
+         WHERE FUND_NAME = '{fund_name}' AND C_DATE <= '{t}' ORDER BY C_DATE DESC)
+        WHERE rownum <= 252"
+
+index_fund_dev:
+ sql: "SELECT C_DATE, FUND_NAME as c_fundname, A_DEV  FROM RC_MR_INDEX_FUND_MONITOR
+       WHERE C_DATE <= '{t}' AND C_DATE >= '{t0}'
+       ORDER BY C_DATE DESC"
+
+
+check_latest_day:
+  sql: "select max(c_date) as c_date from dpe_dp_tradeday_exchg where c_date <= '%s'"
+
+past_tradeday:
+  Sql: "select c_date from dpe_dp_tradeday_exchg where c_date <= '%s'"
+
+offset_history_date:
+  Sql:
+    "select to_char(d_date, 'yyyy-mm-dd') as c_date from
+     (select d_date from tradeday
+      where d_date <= date'{t}' and c_flag = 1 ORDER BY d_date desc)
+     where rownum <= ({n}+1)"
+
+offset_future_date:
+ Sql:
+    "select to_char(d_date, 'yyyy-mm-dd') as c_date from
+     (select d_date from tradeday
+      where d_date >= date'{t}' and c_flag = 1 ORDER BY d_date)
+     where rownum <= ({n}+1)"
+
+past_n_tradedays:
+ sql: "select * from
+       (select c_date from dpe_dp_tradeday_exchg where c_date <= '{t}' order by c_date desc)
+       where rownum <= {n}"
+
+
+index_nav_wind:
+  sql: "select to_char(to_date(trade_dt, 'yyyymmdd'), 'yyyy-mm-dd') as c_date, s_info_windcode as wind_code, s_dq_close as nav
+        from CBondIndexEODCNBD
+        where s_info_windcode in {code} and trade_dt >= '{t0}' and trade_dt <= '{t1}' order by trade_dt"
+
+index_nav_jy:
+  sql: "select to_char(a.tradingday, 'yyyy-mm-dd') as c_date, b.secucode as wind_code, a.closeprice as nav
+        from JYDB.QT_INDEXQUOTE a
+        left join JYDB.SecuMain b on a.innercode = b.innercode
+        WHERE b.secucode in {code} and a.tradingday >= date'{t0}' and a.tradingday <= date'{t1}'
+        ORDER BY a.tradingday"
+
+index_nav_csi:
+  sql: "select to_char(a.tradingday, 'yyyy-mm-dd') as c_date, b.secucode as wind_code, a.closeprice as nav
+        from JYDB.QT_CSIINDEXQUOTE a
+        left join JYDB.SecuMain b on a.indexcode = b.innercode
+        WHERE b.secucode in {code} and a.tradingday >= date'{t0}' and a.tradingday <= date'{t1}'
+        ORDER BY a.tradingday"
+
+index_nav_hk:
+  sql: "select to_char(a.tradingday, 'yyyy-mm-dd') as c_date, b.secucode as wind_code, a.closeprice as nav
+        from JYDB.QT_OSINDEXQUOTE a
+        left join JYDB.SecuMain b on a.indexcode = b.innercode
+        WHERE b.secucode in {code} and a.tradingday >= date'{t0}' and a.tradingday <= date'{t1}'
+        ORDER BY a.tradingday"
+
+bond_index_fund:
+  sql: "select a.c_fundcode as portfolio_code, b.c_fundname, a.bch_wealth_code, substr(a.c_fundcode, 0, 6) as secu_code
+        from dpe_indexfund_bchinfo a left join PORTFOLIO_TYPE b
+        on a.c_fundcode = b.c_fundcode where b.type_l2 = '债券指数'"
+
+fund_nav_wind:
+  sql: "select f_info_windcode as wind_code, to_char(to_date(price_date, 'yyyymmdd'), 'yyyy-mm-dd') as c_date,
+        f_nav_adjusted as nav
+        from winddb.ChinaMutualFundNAV
+        where f_info_windcode in {code} and price_date >= '{t0}' and price_date <= '{t1}'"
+
+index_fund_basic_info:
+ sql: "select t1.portfolio_code, t1.c_fundname, t2.type_l2,
+       t3.wind_code as wind_code_a, t4.wind_code as wind_code_c, t1.wealth_index_code, t1.cont_index_code,
+       t1.cont_index_weight, t1.deposit_rate
+       from index_fund_info t1
+       left join PORTFOLIO_TYPE t2 on t1.portfolio_code = t2.c_fundcode
+       left join MF_ARCHIVE t3 on substr(t1.portfolio_code, 0, 6) = t3.secu_code
+	   left join MF_ARCHIVE t4 on substr(t1.cshare_code, 0, 6) = t4.secu_code
+       where t2.setup_date <= date'{bg_date}' and (t2.end_date >= date'{t}' or t2.end_date is null)"
+
+index_fund_bch:
+  sql: "SELECT a.PORTFOLIO_CODE AS C_FUNDCODE, a.C_FUNDNAME, b.type_l2 as c_fundtype, a.WEALTH_INDEX_CODE AS bch_wealth_code,
+        to_char(b.setup_date, 'YYYY-MM-DD') as setup_date,pi2.POS_SET_END
+        FROM index_fund_info a left join PORTFOLIO_TYPE b on a.PORTFOLIO_CODE = b.c_fundcode left join PORTFOLIO_INFOCHG pi2 on a.PORTFOLIO_CODE = pi2.PORTFOLIO_CODE
+        where b.setup_date is not null and pi2.CANCEL_DATE IS NULL"
+
+bond_index_dd_threshold:
+  sql: "SELECT * from MANUAL_THRESHOLD_ADD WHERE C_FULLNAME = '{full_name}'"
+
+rc_alert_dd_oneyear:
+  sql: "select t1.d_date, t2.c_fundcode, t1.c_fundname, t2.type_l0, t2.type_l2, t2.manager, t1.maxdrawdown_oneyear, t1.drawdown_oneyear, t1.drawdown_dura_oneyear, t3.C_FULLNAME, T3.THRESHOLD_DURATION, T3.THRESHOLD_PTM, T3.THRESHOLD_DD_ONEYEAR, T3.THRESHOLD_WINRATIO, T3.INSERT_TIME,
+        (case when (t1.drawdown_oneyear *(-1)>0.005 and t4.\"avgDuration_port\" >=2) then 1
+        when (t1.drawdown_oneyear *(-1)>0.0075 and t4.\"avgDuration_port\" >=1.5) then 1
+        when (t1.drawdown_oneyear *(-1)>0.01 and t4.\"avgDuration_port\" >=1) then 1
+        when (t1.drawdown_oneyear *(-1) > t3.threshold_dd_oneyear * 0.8) then 1
+        else 0
+        end) as alert,
+
+        (case when (t1.drawdown_oneyear *(-1)>0.005 and t4.\"avgDuration_port\" >=2) then '预警档1'
+        when (t1.drawdown_oneyear *(-1)>0.0075 and t4.\"avgDuration_port\" >=1.5) then '预警档2'
+        when (t1.drawdown_oneyear *(-1)>0.01 and t4.\"avgDuration_port\" >=1) then '预警档3'
+        when (t1.drawdown_oneyear *(-1) > t3.threshold_dd_oneyear * 0.8) then '预警档4'
+        else '无'
+        end) as alert_level,
+        t4.\"avgDuration_port\"
+
+        from rc_mr_maxdd t1
+        left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+        left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode
+        left join rc_mr_holding t4 on t1.c_fundname = t4.c_fundname and t1.d_date = t4.d_date
+        where t1.d_date = '{t}'
+        and t3.THRESHOLD_DD_ONEYEAR is not null
+        "
+
+rc_alert_dd:
+  sql: "select * from
+        (select t1.c_fundname, t1.d_date, t2.type_l0 as fundtype, t2.type, t2.type_l1, t2.type_l2, t2.type_l3, t2.manager,
+        t5.\"NetAsset\", t1.drawdown_oneyear as \"DrawDown\", t1.drawdown_dura_oneyear as \"DrawDown_dura\",
+        t4.\"avgDuration_port\", t5.cbond, T3.THRESHOLD_DD_ONEYEAR as dd_threshold,
+        (case when (t1.drawdown_oneyear *(-1)>0.005 and t4.\"avgDuration_port\" >=2) then 1
+        when (t1.drawdown_oneyear *(-1)>0.0075 and t4.\"avgDuration_port\" >=1.5) then 1
+        when (t1.drawdown_oneyear *(-1)>0.01 and t4.\"avgDuration_port\" >=1) then 1
+        when (t1.drawdown_oneyear *(-1) > t3.threshold_dd_oneyear * 0.8) then 1
+        else 0
+        end) as alert,
+        sysdate as insert_time,
+        (case when (t1.drawdown_oneyear *(-1)>0.005 and t4.\"avgDuration_port\" >=2) then '预警档1'
+        when (t1.drawdown_oneyear *(-1)>0.0075 and t4.\"avgDuration_port\" >=1.5) then '预警档2'
+        when (t1.drawdown_oneyear *(-1)>0.01 and t4.\"avgDuration_port\" >=1) then '预警档3'
+        when (t1.drawdown_oneyear *(-1) > t3.threshold_dd_oneyear * 0.8) then '预警档4'
+        else '无'
+        end) as alert_level
+
+        from rc_mr_maxdd t1
+        left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+        left join manual_threshold_add t3 on t3.portfolio_code = t2.c_fundcode
+        left join rc_mr_holding t4 on t1.c_fundname = t4.c_fundname and t1.d_date = t4.d_date
+        left join rc_style t5 on t1.c_fundname = t5.c_fundname and t1.d_date = t5.d_date
+        where t1.d_date = '{t}'
+        and t3.THRESHOLD_DD_ONEYEAR is not null)
+        where (alert = 1 and type_l1 <> '多策略型') or (alert_level = '预警档4' and type_l1 = '多策略型')"
+
+# 专户回撤预警
+rc_alert_dd_sma:
+  sql: "select * from
+        (select c_fundname, d_date, fundtype, type, type_l1, type_l2, type_l3, manager, \"NetAsset\", \"DrawDown\",
+        \"DrawDown_dura\", \"avgDuration_port\", cbond, dd_threshold,
+        (case when \"DrawDown\" * (-1) >= dd_threshold then 1 else 0 end) as alert,
+        sysdate as insert_time,
+        (case when (\"ReturnRate_cum\" >= period_bch and \"DrawDown\" * (-1) >= dd_threshold) then '预警档4'
+        when (period_ptm <= 90 and \"DrawDown\" * (-1) >= dd_threshold) then '预警档3'
+        when \"DrawDown\" * (-1) >= dd_threshold then '预警档2' else '无' end) as alert_level
+        from
+        (select t1.c_fundname, t1.d_date, t2.type_l0 as fundtype, t2.type, t2.type_l1, t2.type_l2, t2.type_l3,
+        t2.manager, t5.\"NetAsset\", t1.\"DrawDown\", t1.\"DrawDown_dura\", t3.\"ReturnRate_cum\", t3.period_bch,
+        t3.period_ptm, t4.\"avgDuration_port\", t5.cbond,
+        (case when (t2.type_l1 = '混合型' and t3.\"ReturnRate_cum\" >= t3.period_bch) then 0.01
+        when (t2.type_l1 = '混合型' and t3.period_ptm <= 90) then 0.015 when t2.type_l1 = '混合型' then 0.025
+        when (t2.type_l2 = '标准型' and t3.\"ReturnRate_cum\" >= t3.period_bch) then 0.0075
+        when (t2.type_l2 = '标准型' and t3.period_ptm <= 90) then 0.01 when t2.type_l2 = '标准型' then 0.02
+        when t3.\"ReturnRate_cum\" >= t3.period_bch then 0.005 when t3.period_ptm <= 90 then 0.0075 else 0.015 end) as dd_threshold
+        from rc_mr_return t1
+        left join portfolio_type t2 on t1.c_fundname = t2.c_fundname
+        left join rc_mgmt_returngap t3 on t1.c_fundname = t3.c_fundname and t1.d_date = t3.d_date
+        left join rc_mr_holding t4 on t1.c_fundname = t4.c_fundname and t1.d_date = t4.d_date
+        left join rc_style t5 on t1.c_fundname = t5.c_fundname and t1.d_date = t5.d_date
+        where t1.d_date = '{t}'
+        and t2.type_l0 = '专户' and t2.type_l1 in ('债券型', '混合型') and t2.type_l2 <> '存单型' and t2.type_l4 <> '理财固收+')
+        )
+        where alert = 1"
+
+fund_types_all:
+  sql: "select distinct RANKINGLIST FROM FR_FUNDRANK"
+
+fund_ranking_list:
+  sql: "SELECT WINDCODE as SECUCODE, FUNDNAME FROM FR_FUNDRANK
+        WHERE ANALYSIS_DATE = '{t}' and RETURN_PERIOD= '{period}' and RANKINGLIST = '{fund_type}'"
+
+industry_fund_nav:
+  sql: "SELECT a.F_INFO_WINDCODE as windcode, a.max_nav, b.crt_nav FROM
+        (SELECT F_INFO_WINDCODE, max(F_NAV_ADJUSTED) as max_nav FROM ChinaMutualFundNAV
+         WHERE F_INFO_WINDCODE in {windcode} AND PRICE_DATE >= '{t0}' AND PRICE_DATE <= '{t}'
+         GROUP BY F_INFO_WINDCODE) a
+        LEFT JOIN
+        (SELECT F_INFO_WINDCODE, F_NAV_ADJUSTED as crt_nav FROM ChinaMutualFundNAV
+         WHERE F_INFO_WINDCODE in {windcode} AND PRICE_DATE = '{t}') b
+        on a.F_INFO_WINDCODE = b.F_INFO_WINDCODE"
+
+mutual_fund_maxdd_thisyear:
+  sql: "SELECT S_INFO_WINDCODE as windcode, F_MAXDOWNSIDE_THISYEART/100 as max_dd
+        FROM ChinaMFPerformance
+        WHERE S_INFO_WINDCODE in {windcode} and TRADE_DT = '{t}'"
+
+mutual_fund_maxdd_quater:
+  sql: "SELECT S_INFO_WINDCODE as windcode, F_MAXDOWNSIDE_QUARTER/100 as max_dd
+        FROM ChinaMFPerformance
+        WHERE S_INFO_WINDCODE in {windcode} and TRADE_DT = '{t}'"
+
+mutual_fund_maxdd_year:
+  sql: "SELECT S_INFO_WINDCODE as windcode, F_MAXDOWNSIDE_YEAR/100 as max_dd
+        FROM ChinaMFPerformance
+        WHERE S_INFO_WINDCODE in {windcode} and TRADE_DT = '{t}'"
+
+
+trade_day_df:
+  sql: "select c_date from dpe_dp_tradeday_exchg where C_DATE >= '2021-12-03' ORDER BY C_DATE"
+
+jy_crmw_market:
+  Sql: "select * from secumain where secucategory = 31 and secucode in (%s)"
+
+previous_trade_date:
+  Sql: "select max(c_date) as c_date from dpe_dp_tradeday_exchg where c_date < '{t}'"
+
+lastest_trade_date:
+ Sql: "select max(c_date) as c_date from dpe_dp_tradeday_exchg where c_date <= '{t}'"
+
+period_trade_days:
+ Sql: "SELECT c_date, d_date from DPE_DP_TRADEDAY_EXCHG
+     WHERE d_date>=date'{t0}' AND d_date<=date'{t1}'
+     ORDER BY D_DATE"
+
+period_trade_dates:
+  Sql: "SELECT c_date, d_date from DPE_DP_TRADEDAY_EXCHG
+        WHERE d_date>=date'{t0}' AND d_date<=date'{t1}'
+        ORDER BY D_DATE"
+
+ptf_size_market:
+ Sql:  "with port_info as
+       (select c_fundcode, c_fundname, ranking_list, substr(c_fundcode, 0, 6) as secu_code from PORTFOLIO_TYPE
+        where end_date is null or end_date >= date'{t}')
+
+       select t0.c_fundcode as portfolio_code, t0.c_fundname, t0.ranking_list,
+       t1.\"NetAsset\"/1e8 as lastm_size, t2.\"NetAsset\"/1e8 as lastq_size, t3.\"NetAsset\"/1e8 as lasty_size,
+       t4.crt_dd as mid_crtdd_1y, t4.max_dd as mid_maxdd_1y,
+       t5.drawdown_oneyear as crtdd_1y, t5.drawdown_dura_oneyear as crtdd_dura_1y,
+       t5.maxdrawdown_oneyear as maxdd_1y, t5.maxdrawdown_dura_oneyear as maxdd_dura_1y
+       from port_info t0
+       left join (select * from rc_style where d_date = '{last_m}') t1
+       on t0.c_fundname = t1.c_fundname
+       left join (select * from rc_style where d_date = '{last_q}') t2
+       on t0.c_fundname = t2.c_fundname
+       left join (select * from rc_style where d_date = '{last_y}') t3
+       on t0.c_fundname = t3.c_fundname
+       left join
+       (select * from MF_RANK_SUMMARY
+       where RETURN_PERIOD = '近一年' and STATISTIC_TYPE = '中位数' and c_date = '{t}') t4
+       on t0.RANKING_LIST = t4.RANKING_LIST
+       left join (select * from rc_mr_performance where c_date='{t}' and return_period = '今年以来') t5
+       on t0.c_fundname = t5.c_fundname"
+
+
+portfolio_rank_mg:
+  Sql: "with port_info as
+        (select c_fundcode, c_fundname, ranking_list, substr(c_fundcode, 0, 6) as secu_code
+         from PORTFOLIO_TYPE
+         where end_date is null or end_date >= date'{t}')
+
+        select t0.c_fundcode as portfolio_code, t0.c_fundname, t0.ranking_list, t1.\"NetAsset\"/1e8 as lastqtr_size,
+        t2.return as midret_ytd, t3.vol_w_ann as annvol_3m,
+        t4.crt_dd as mid_crtdd_1y, t4.max_dd as mid_maxdd_1y,
+        t5.drawdown_oneyear as crtdd_1y, t5.drawdown_dura_oneyear as crtdd_dura_1y,
+        t5.maxdrawdown_oneyear as maxdd_1y, t5.maxdrawdown_dura_oneyear as maxdd_dura_1y
+        from port_info t0
+        left join
+        (select * from rc_style where d_date = '{last_qtr}') t1
+        on t0.c_fundname = t1.c_fundname
+        left join
+        (select * from MF_RANK_SUMMARY
+         where RETURN_PERIOD = '今年以来' and STATISTIC_TYPE = '中位数' and c_date = '{t}') t2
+        on t0.RANKING_LIST = t2.RANKING_LIST
+        left join
+        (select * from mf_performance
+         where return_period = '近三月' and c_date = '{t}') t3
+        on t0.secu_code = t3.secu_code
+        left join
+        (select * from MF_RANK_SUMMARY
+         where RETURN_PERIOD = '近一年' and STATISTIC_TYPE = '中位数' and c_date = '{t}') t4
+        on t0.RANKING_LIST = t4.RANKING_LIST
+        left join (select * from rc_mr_maxdd where d_date='{t}') t5
+        on t0.c_fundname = t5.c_fundname"
+
+rc_mr_performance:
+  Sql: "select * from rc_mr_performance where c_date = '{t}'"
+
+mf_rank_summary:
+ Sql: "select * from mf_rank_summary
+       where c_date = '{t}' and return_period in ('今年以来', '近三月') and STATISTIC_TYPE = '中位数'"
+
+rc_mr_performance_mkt:
+  Sql: "select * from rc_mr_performance_mkt where c_date = '{t}' and STATISTIC_TYPE = '中位数'"
+
+mg_mmf_investors:
+  Sql: "with port_info as
+        (select c_fundcode, c_fundname, substr(c_fundcode, 0, 6) as secu_code
+         from PORTFOLIO_TYPE where type_l1 = '货币型')
+
+        select t0.c_fundname, t1.SHARES_INDIVIDUAL / t1.shares_total as 个人投资者,
+        (t1.SHARES_INSTITUTION + t1.SHARES_PRODUCT)/t1.SHARES_TOTAL as 机构投资者, t2.top10_ratio as 前10大投资者
+        from port_info t0
+        left join (select * from IDC_FUNDHOLDERS where c_date= '{t}') t1
+        on t0.c_fundcode = t1.portfolio_code
+        left join
+        (select portfolio_code, sum(shares_ratio) as top10_ratio FROM DWD_PROD_TOP10_HOLDERS
+         WHERE c_date= '{t}' GROUP BY portfolio_code) t2
+        on t0.c_fundcode = t2.portfolio_code"
+
+mg_mmf_ptf_level:
+ Sql: "SELECT t1.c_date, t1.portfolio_code, t2.c_fundname, t1.dev_degree, t1.ptfl_avg_matu_day,
+       t1.risk_fr_5d_matu_ast_nav_ratio
+       FROM DWS_PTFL_VALUATION_INDEX t1
+       left join portfolio_type t2 on t1.portfolio_code = t2.c_fundcode
+       WHERE t1.C_DATE = '{t}' AND t1.DATA_LEVEL = '产品' AND t1.full_name LIKE '%货币%'"
+
+mg_mmf_share_level:
+ Sql: "SELECT c_date, PORTFOLIO_CODE, SHARE_TYPE, prod_code, anal_yld_7d
+       FROM DWS_PTFL_VALUATION_INDEX
+       WHERE C_DATE = '{t}' AND DATA_LEVEL = '产品子类' AND full_name LIKE '%货币%'"
+
+mg_mmf_pf:
+ Sql: " SELECT t1.WIND_CODE as prod_code, t1.ranking_list, t1.week_annret as ret_{period},
+        t2.week_annret as mid_ret_{period}, t1.week_annret_rank as ret_rank_{period}
+        FROM (SELECT * FROM mf_mmf_rank WHERE C_DATE = '{t}' AND RETURN_PERIOD = '{period}' AND WIND_CODE  IN {code}) t1
+        LEFT JOIN (select * from MF_MMF_SUMMARY where STATISTIC_TYPE = '中位数' and c_date= '{t}') t2
+        ON t1.ranking_list = t2.ranking_list AND t1.return_period = t2.return_period"
+
+fund_holders_mg:
+ Sql: "select t0.c_date, t0.PORTFOLIO_CODE, t2.c_fundname, t1.HOLDER_TYPE_L1, t1.HOLDER_TYPE_L2,
+       t1.HOLDING_SHARES/t3.total_shares as hold_ratio
+       FROM
+       (SELECT portfolio_code, MAX(c_date) AS c_date FROM DWS_PROD_HOLDERS_BY_ORG
+        WHERE c_date <= '{t}' GROUP BY portfolio_code) t0
+       left join DWS_PROD_HOLDERS_BY_ORG t1
+       on t0.c_date = t1.c_date and t0.portfolio_code = t1.portfolio_code
+       left join PORTFOLIO_TYPE t2
+       on t0.PORTFOLIO_CODE = t2.c_fundcode
+       left join (select * from DWS_PTFL_VALUATION_INDEX where data_level = '产品') t3
+       on t0.portfolio_code = t3.portfolio_code and t0.c_date = t3.c_date"
+
+top_holders_bank_mg:
+ Sql: "select PORTFOLIO_CODE, fund_name,investor_name,holder_type_l2,decode(holding_shares_sum,0,0,holding_shares/holding_shares_sum)  as hold_ratio
+ from (select PORTFOLIO_CODE, fund_name,investor_name,holder_type_l2,holding_shares,sum(holding_shares) over (partition by PORTFOLIO_CODE) as holding_shares_sum
+      FROM DWD_prod_holders_shr_n_trd
+       WHERE C_DATE = '{t}')"
+
+top_holders_mg:
+ Sql: "select PORTFOLIO_CODE, INVESTOR_NAME as investor, SHARES_RATIO as ratio,
+       row_number() over (PARTITION by C_DATE, PORTFOLIO_CODE order by shares desc ) as rank
+       FROM DWD_PROD_TOP10_HOLDERS
+       WHERE C_DATE = '{t}'"
+
+fund_company_mg:
+ Sql: "select t1.*, t2.RETURN, t2.return_rank
+       FROM (
+       SELECT RANKING_LIST, COMPANY, sample_size, NET_ASSET, NET_ASSET_RANK
+       from mf_company_rank
+       where c_date = '{t}' and (RETURN_PERIOD IS NULL OR RETURN_PERIOD = '近一月') ) t1
+       LEFT JOIN
+       (SELECT RANKING_LIST, company, RETURN, return_rank FROM mf_company_rank
+       where c_date = '{t}' AND RETURN_PERIOD = '今年以来') t2
+       ON t1.ranking_list = t2.ranking_list AND t1.company = t2.company"
+
+size_daily:
+ Sql: " select t0.c_fundcode as portfolio_code, t0.c_fundname, t0.manager_master,
+        t0.type_l0, t0.type_l1, t0.type_l2, t0.type_l3,
+        t4.net_asset/1e8 as crt_size, t1.net_asset/1e8 as lastm_size,
+        t2.net_asset/1e8 as lastq_size, t3.net_asset/1e8 as lasty_size
+        from portfolio_type t0
+        left join (select * from DWS_PTFL_MAIN_ASSET_SUMY  where c_date = '{last_m}') t1
+        on t0.c_fundcode = t1.portfolio_code
+        left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{last_q}') t2
+        on t0.c_fundcode = t2.portfolio_code
+        left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{last_y}') t3
+        on t0.c_fundcode = t3.portfolio_code
+        left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{t}') t4
+        on t0.c_fundcode = t4.portfolio_code
+        where t0.end_date is null or t0.end_date >= date'{t}'"
+
+mg_past_size:
+ Sql: "select t0.c_fundcode as portfolio_code,
+       t1.net_asset/1e8 as lastm_size, t2.net_asset/1e8 as lastq_size, t3.net_asset/1e8 as lasty_size
+       from portfolio_type t0
+       left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{last_m}') t1
+       on t0.c_fundcode = t1.portfolio_code
+       left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{last_q}') t2
+       on t0.c_fundcode = t2.portfolio_code
+       left join (select * from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{last_y}') t3
+       on t0.c_fundcode = t3.portfolio_code"
+
+mg_pastyear_dd:
+ Sql: "select t1.portfolio_code, t1.ranking_list,
+       nvl(t2.crt_dd, t1.crt_dd) as crt_dd_{period}, nvl(t2.crtdd_dura, t1.crtdd_dura) as crtdd_dura_{period},
+       nvl(t2.max_dd, t1.max_dd) as max_dd_{period}
+       from (select * from rc_mr_performance where c_date = '{t}' and return_period = '成立以来') t1
+       left join (select * from rc_mr_performance where c_date = '{t}' and return_period = '{period}') t2
+       on t1.portfolio_code = t2.portfolio_code and t1.ranking_list = t2.ranking_list "
+
+mg_pastyear_dd_median:
+ Sql: "select ranking_list, crt_dd as crtdd_mid, max_dd as maxdd_mid
+       from mf_rank_summary
+       where statistic_type = '中位数' and c_date = '{t}' and return_period = '{period}'"
+
+mg_longterm_setup:
+ Sql: "select c_fundcode as portfolio_code, c_fundname, manager_master as manager, setup_date
+       from PORTFOLIO_TYPE
+       where setup_date <= date'{t}' and (end_date is null or end_date >= date'{t}')"
+
+mg_longterm_rankinglist:
+ Sql: "select t1.portfolio_code, t1.default_rankinglist as ranking_list
+     from (select secu_code, max(list_date) as list_date from PORTFOLIO_RANKINGLIST
+     where list_date <= '{t}' GROUP BY secu_code) t0
+     left join PORTFOLIO_RANKINGLIST t1
+     on t0.secu_code = t1.secu_code and t0.list_date = t1.list_date"
+
+mg_longterm_mgr:
+ Sql: "select portfolio_code, bg_date, substr(period, 0, instr(period, '接手以来')-1) as mgr_aux
+       from PORTFOLIO_KEYPERIOD
+       where bg_date <= '{t}' and (end_date is null or end_date >= '{t}')
+       and period like '%接手以来%'"
+
+mg_longterm_infochg:
+ Sql: "select portfolio_code, period, bg_date
+       from PORTFOLIO_KEYPERIOD
+       where bg_date <= '{t}' and (end_date is null or end_date >= '{t}')
+       and period like '%策略变更以来%'"
+
+mg_longterm_performance:
+ Sql: "select t1.ranking_list, t1.return_period, t1.period_bgdate, t1.portfolio_code,
+       t1.return, t1.return_ann,
+       case when t1.return_period in ('今年以来', '近一年', '近二年', '近三年', '近五年', '近三月', '近一月', '近六月') then t3.return else t2.return end as ret_mid,
+       case when t1.return_period in ('今年以来', '近一年', '近二年', '近三年', '近五年', '近三月', '近一月', '近六月') then t3.return_ann else t2.return_ann end as ret_ann_mid,
+       t1.return_rankpct, t1.return_rank
+       from (select * from RC_MR_PERFORMANCE where c_date = '{t}') t1
+       left join (select * from RC_MR_PERFORMANCE_MKT where c_date = '{t}' and statistic_type = '中位数') t2
+       on t1.portfolio_code = t2.portfolio_code and t1.ranking_list = t2.ranking_list and t1.return_period = t2.return_period
+       left join (select * from MF_RANK_SUMMARY where c_date = '{t}' and statistic_type = '中位数') t3
+       on t1.ranking_list = t3.ranking_list and t1.return_period = t3.return_period"
+
+mg_volatiliy:
+ Sql: "select portfolio_code, ranking_list, vol_w_ann from rc_mr_performance
+       where return_period = '近三月' and c_date = '{t}'"
+
+
+dpe_portfoliobond:
+ Sql: "select * from dpe_portfoliobond where d_date='%s'"
+
+classify_creditbond_info:
+ Sql: "with comp_rating as
+       (select t3.* from
+          (select 公司名称，max(评级日期) as 评级日期 from crds_vw_evaluation_m_rating
+           where 评级日期 <= '{t}' and 评级状态 not in ('暂存') GROUP BY 公司名称) t2
+           left join crds_vw_evaluation_m_rating t3
+           on t2.公司名称 = t3.公司名称 and t2.评级日期 = t3.评级日期
+           WHERE t3.评级状态 not in ('暂存') ),
+       bond_rating as
+       (select DISTINCT 债项代码, 债项名称, 评级级别, 评级展望, 公司代码, 公司名称, 主体评级, 行业一级名称, 行业二级名称
+        from crds_vw_evaluation_d_rating_n
+        where 评级生效日期 <= '{t}' and 评级失效日期 > '{t}')
+
+       select distinct code as bond_code, yield_cnbd, ptmyear, company_code, company_name as bond_issuer,
+       t1.c_subname_bsh,
+       (case when bond_rating.行业二级名称 = '城投' then '城投债' when t1.subordinate = '是' then '次级债'
+        when (bond_rating.行业二级名称 ！= '城投' and t1.bond_style = '城投债') then '产业债' else t1.bond_style end) as bond_style,
+       t1.windl1type, t1.windl2type,
+       t1.rate_ratebond1 as rating_bond, t1.rate_latestmir_cnbd as mir_rating_b, bond_rating.评级级别 as inner_rating_b,
+       comp_rating.评级级别 as inner_rating_i, bond_rating.评级展望 as rating_outlook,
+       bond_rating.行业一级名称 as industry_level1, bond_rating.行业二级名称 as industry_level2,
+       bond_info_wind.b_info_issuertype as issuer_type, replace(t1.perpetual, 'nan', '正常') as type_perpetual,
+       crds_company_basic_info.regarea, city_grade,
+       (case when city_grade = 1 then '省级' when city_grade = 2 then '市级' when city_grade = 3 then '区县级' else null end) as city_level,
+       crds_sys_area.regarea_tree, level1, level2, level3, register_address
+       from dpe_portfoliobond t1
+       left join bond_rating
+       on t1.code = bond_rating.债项代码
+       left join crds_company_debt_info t2
+       on t1.code = t2.debt_code
+       left join crds_company_basic_info
+       using (company_code)
+       left join crds_sys_area
+       on crds_company_basic_info.regarea = crds_sys_area.areacode
+       left join comp_rating
+       on crds_company_basic_info.company_name = comp_rating.公司名称
+       left join cbonddescription@winddb bond_info_wind
+       on t1.code = bond_info_wind.s_info_windcode
+       where d_date = '{t}'
+       and windl1type not in ('资产支持证券', '可转债', '可交换债')
+       and bond_style <> '利率债'"
+
+credit_rating_map:
+ Sql: "select * from dpe_credit_rating_map"
+
+
+rm_threshold:
+ sql: "select t1.*, t2.manager_master as manager
+       from
+       (SELECT PORTFOLIO_CODE, min(CANCEL_DATE) AS crt_effective
+        FROM RM_THRESHOLD
+        WHERE CANCEL_DATE > '{t}'
+        GROUP BY PORTFOLIO_CODE ) t0
+       left join RM_THRESHOLD t1 on t0.PORTFOLIO_CODE = t1.PORTFOLIO_CODE and t0.crt_effective = t1.CANCEL_DATE
+       left join portfolio_type t2
+       on t0.PORTFOLIO_CODE = t2.c_fundcode"
+
+rm_threshold_indexfund:
+ sql: "select t0.*, t1.manager_master as manager
+       from RM_THRESHOLD_INDEXFUND t0
+       left join
+       portfolio_type t1
+       on t0.PORTFOLIO_CODE = t1.c_fundcode"
+
+rm_threshold_cpr:
+ sql: "SELECT RANKING_LIST, CRT_DD as cpr_dd
+       FROM MF_RANK_SUMMARY
+       WHERE c_date = '{t}' AND RETURN_PERIOD = '{dd_period}' AND STATISTIC_TYPE = '中位数'"
+
+rm_indicators_bmindex:
+ sql: "select bm_index_code, crt_dd as dd_bm
+       from BENCHMARK_PERFORMANCE
+       where c_date = '{t}' and period = '{period}' and bm_index_code in ({code})"
+
+rm_indicators:
+ sql: "select '{t}' as c_date, t0.portfolio_code, t0.ranking_list, t5.\"NetAsset\"/1e8 as net_asset,
+       nvl(t2.period_bgdate, t1.period_bgdate) as period_bgdate,
+       nvl(t2.crt_dd, t1.crt_dd) as dd_fund,
+       case when t2.crt_dd is null then t1.crtdd_dura else t2.crtdd_dura end as dd_dur_fund,
+       case when t8.crt_dd is null then t7.crt_dd else t8.crt_dd end as dd_mkt,
+       t3.\"avgDuration_port\" + nvl(t4.ctd_equi_dura, 0) as dur_fund,
+       t5.cbond * t5.\"TotalAsset\"/t5.\"NetAsset\" as cb_pos, t5.stock * t5.\"TotalAsset\"/t5.\"NetAsset\" as stk_pos,
+       (nvl(t5.cbond,0) + nvl(t5.stock,0)) * t5.\"TotalAsset\"/t5.\"NetAsset\" as eq_pos,
+       t6.a_ann_dev as track_dev
+       from
+       (select t1.portfolio_code, t1.c_fundname, t1.default_rankinglist as ranking_list
+        from (select secu_code, max(list_date) as list_date from PORTFOLIO_RANKINGLIST
+        where list_date <= '{t}' GROUP BY secu_code) t0
+        left join PORTFOLIO_RANKINGLIST t1 on t0.secu_code = t1.secu_code and t0.list_date = t1.list_date
+        left join portfolio_type t2 on t1.PORTFOLIO_CODE = t2.c_fundcode
+        where t2.SETUP_DATE <= date'{t}' and (t2.end_date is null or t2.end_date >= date'{t}')) t0
+       left join
+       (select c_date, portfolio_code, ranking_list, crt_dd, crtdd_dura, period_bgdate
+        from rc_mr_performance where c_date = '{t}' and return_period = '成立以来') t1
+       on t0.portfolio_code = t1.portfolio_code and t0.ranking_list = t1.ranking_list
+       left join
+       (select c_date, portfolio_code, ranking_list, crt_dd, crtdd_dura, period_bgdate
+       from rc_mr_performance where c_date = '{t}' and return_period = '{period}') t2
+       on t0.portfolio_code = t2.portfolio_code and t0.ranking_list = t2.ranking_list
+       left join (select * from RC_MR_HOLDING where d_date = '{t}') t3
+       on t0.c_fundname = t3.c_fundname
+       left join (select * from RC_DERIVT where d_date = '{t}') t4
+       on t0.c_fundname = t4.c_fundname
+       left join (select * from RC_STYLE where d_date = '{t}') t5
+       on t0.c_fundname = t5.c_fundname
+       left join (select * from rc_mr_index_fund_monitor where c_date = '{t}') t6
+       on t0.portfolio_code = t6.portfolio_code
+       left join
+       (select c_date, portfolio_code, ranking_list, crt_dd
+        from rc_mr_performance_mkt where c_date = '{t}' and return_period = '{period_bck}' and statistic_type = '中位数') t7
+       on t0.portfolio_code = t7.portfolio_code and t0.ranking_list = t7.ranking_list
+       left join
+       (select c_date, ranking_list, crt_dd
+        from mf_rank_summary where c_date = '{t}' and return_period = '{period}' and statistic_type = '中位数') t8
+       on t0.ranking_list = t8.ranking_list"
+
+rm_indicators_fundpos:
+ sql: "SELECT t1.PORTFOLIO_CODE, t1.FULL_NAME, t1.SEC_CODE, t1.SEC_ABBR, t2.CGSTYPE_L1, t2.CGSTYPE_L2, t2.CGSTYPE_L3,
+       t1.fmv_nav_ratio/100 as fmv_nav_ratio
+       FROM dwd_ptfl_position_detail t1
+       LEFT JOIN (SELECT * FROM MF_CGS_TYPE
+       WHERE rpt_date in (SELECT max(rpt_date) FROM mf_cgs_type WHERE rpt_date <= '{t}')) t2
+       ON t1.SEC_CODE = t2.WIND_CODE
+       WHERE t1.c_date = '{t}'
+       AND t1.SEC_TYPE_L1 = '基金'"
+
+rm_indicators_competitor:
+ sql: "SELECT c_date, EXP(SUM(LN(1+ DAILY_RETURN)) over (order by c_date)) AS nav
+       FROM MF_RANK_PERFORMANCE_DAILY
+       WHERE RANKING_LIST = '{type}'
+       AND STATISTIC_TYPE = '中位数'
+       AND c_date >= '{bg_date}'
+       ORDER BY C_DATE"
+
+rm_indicators_credit_dur:
+ sql: "SELECT t2.C_FUNDCODE AS portfolio_code, sum(F_ASSETRATIO*\"Duration\")/sum(F_ASSETRATIO) AS credit_dur_fund
+       FROM DPE_PORTFOLIOBOND t1
+       LEFT JOIN PORTFOLIO_TYPE t2 ON t1.C_FUNDNAME = t2.C_FUNDNAME
+       WHERE d_date = '{t}'
+       AND ((BOND_STYLE IN ('金融债', '产业债', '城投债') AND WINDL2TYPE not IN ('商业银行次级债券'))
+             or (WINDL2TYPE = '商业银行次级债券' AND PTMYEAR <= 3))
+       GROUP BY t2.C_FUNDCODE"
+
+rm_threshold_pos:
+ sql: "select * from rm_threshold_pos"
+
+rm_b_plus_holding:
+ sql: "SELECT t1.*, t2.INNER_RATING_B
+       FROM DPE_PORTFOLIOBOND t1
+       LEFT JOIN DPE_CREDITBOND_INFO t2
+       ON t1.D_DATE = t2.C_DATE AND t1.CODE = t2.BOND_CODE
+       LEFT JOIN PORTFOLIO_TYPE t3 ON t1.C_FUNDNAME = t3.C_FUNDNAME
+       left join dpe_portfoliocrmw t4
+       on t1.d_date = t4.d_date and t1.code = t4.crm_subjectcode and t1.c_fundname = t4.c_fundname
+       WHERE t2.INNER_RATING_B IN ('B+', 'B', 'B-')
+       AND t1.windl2type not in ('商业银行债', '同业存单', '商业银行次级债券')
+       AND t3.TYPE_L0 = '公募' AND t3.TYPE_L1 NOT IN ('多策略型')
+       and t1.c_fundname NOT in ('永赢盈益债券')
+       AND t4.C_SUBNAME_BSH IS NULL
+       AND T1.D_DATE = '{t}'"
+
+dpe_asset_type:
+  stock:
+    "select t1.sec_code, t1.sec_abbr, nvl(t2.industry_sw1, '其他') as sec_type_l1,
+     nvl(t2.industry_sw2, '其他') as sec_type_l2, '股票' as asset_type, '股票' as liq_type_l1, t3.cap as liq_type_l2
+     from
+     (SELECT DISTINCT sec_code, sec_abbr FROM DWD_PTFL_POSITION_DETAIL
+      WHERE c_date = '{t}' AND sec_type_l1 = '股票') t1
+     left join (SELECT * from DPE_SDP_STOCKCHRC where c_date = '{t}') t2
+     on t1.sec_code = t2.stock_code
+     left join
+     (select * from dpe_sa_val
+     where trd_date = (select max(trd_date) from dpe_sa_val where trd_date <= '{t}')) t3
+     on t1.sec_code = t3.stock_code"
+
+  derivative:
+   "SELECT distinct CASE WHEN sec_type_l1 = '互换' THEN subcode ELSE sec_code END AS sec_code, sec_abbr,
+    CASE WHEN sec_type_l2 = '信用风险缓释凭证' THEN 'CRMW' ELSE sec_type_l2 END AS sec_type_l1,
+    '-' AS sec_type_l2, '衍生品' AS asset_type, '衍生品' AS liq_type_l1,
+    CASE WHEN sec_type_l2 = '信用风险缓释凭证' THEN 'CRMW' ELSE sec_type_l2 END AS liq_type_l2
+    FROM DWD_PTFL_POSITION_DETAIL
+    WHERE c_date = '{t}'
+    AND sec_type_l1 IN ('信用风险缓释工具', '期货', '期权', '互换', '权证')"
+
+  cbond:
+   "select distinct cbond_windcode as sec_code, c_subname as sec_abbr,
+           equity_style as sec_type_l1, ind as sec_type_l2, '可转债' as asset_type,
+           '可转债' as liq_type_l1, size_style as liq_type_l2
+    from cba_bs_detail where d_date = '{t}'"
+
+  bond:
+   "select distinct t0.code as sec_code, t0.c_subname_bsh as sec_abbr, t0.ir_or_cr as sec_type_l1,
+         nvl(t2.bond_style, t0.bond_style) as sec_type_l2, '债券' as asset_type,
+         case when t0.BOND_STYLE = '利率债' and t0.windl1type <> '地方政府债' then '利率债'
+         when t0.windl1type = '地方政府债' then '信用债' else t2.bond_style_adj end as liq_type_l1,
+         case when t0.BOND_STYLE = '利率债' and t0.windl1type <> '地方政府债' then t1.liq_type_ir
+         when t0.windl1type = '地方政府债' then '长债（高等级）'
+         when t0.BOND_STYLE in ('金融债', 'CD') then t2.liq_type_fi
+         when t0.bond_term = '短债' and t2.inner_rating_cls = '高等级' then '短债（高等级）'
+         when t0.bond_term = '短债' and t2.inner_rating_cls in ('中等级', '低等级') then '短债（中低等级）'
+         when t0.bond_term = '长债' and t2.inner_rating_cls = '高等级' then '长债（高等级）'
+         when t0.bond_term = '长债' and t2.inner_rating_cls in ('中等级', '低等级') then '长债（中低等级）' else '' end as liq_type_l2
+   from
+        (select distinct code, c_subname_bsh, ir_or_cr, bond_style, windl1type,
+        case when windl1type = '短期融资券' or WINDL2TYPE = '证券公司短期融资券' then '短债' else '长债' end as bond_term
+        from dpe_portfoliobond where d_date = '{t}'
+        and windl1type not in ('资产支持证券', '可转债', '可交换债')) t0
+        left join
+        (select distinct code, case when activity in ('活跃券', '次活跃券') then '活跃及次活跃券' else '非活跃券' end as liq_type_ir
+         from rc_lr_factor_ir_data where d_date = (select max(d_date) from rc_lr_factor_ir_data where d_date <= '{t}')) t1
+        on t0.code =t1.code
+        left join
+        (select distinct bond_code, bond_style,
+        case when bond_style = '同业存单' and issuer_type in ('国有商业银行', '股份制商业银行') then '国股行'
+        when bond_style = '同业存单' and issuer_type = '城市商业银行' then '城商行'
+        when bond_style = '同业存单' and issuer_type = '农村商业银行' then '农商行'
+        when bond_style = '同业存单' then '其他同业存单'
+        when bond_style = '次级债' then '二级资本债'
+        when bond_style = '金融债' and issuer_type = '国有商业银行' then '国有行'
+        when bond_style = '金融债' and issuer_type = '股份制商业银行' then '股份行'
+        when bond_style = '金融债' and issuer_type = '城市商业银行' then '城商行'
+        when bond_style = '金融债' and issuer_type = '农村商业银行' then '农商行'
+        when bond_style = '金融债' and issuer_type = '农村商业银行' then '农商行'
+        when bond_style = '金融债' and windl2type = '商业银行债' then '其他商行'
+        when bond_style = '金融债' and windl2type = '证券公司债' then '证券'
+        when bond_style = '金融债' and windl2type = '保险公司债' then '保险'
+        when bond_style = '金融债' and industry_level2 = '租赁' then '租赁'
+        when bond_style = '金融债' then '其他金融债' else '非金融债' end as liq_type_fi,
+        case when bond_style = '次级债' and windl1type = '金融债' then '金融债'
+        when bond_style in ('产业债', '城投债') then '信用债' else bond_style end as bond_style_adj,
+        inner_rating_cls
+        from DPE_CREDITBOND_INFO where c_date = '{t}') t2
+        on t0.code = t2.bond_code"
+
+  fund:
+    "select t1.sec_code, t1.sec_abbr,
+     t2.cgs_type_l1 as sec_type_l1, t2.cgs_type_l2 as sec_type_l2, '基金' as asset_type, '基金' as liq_type_l1
+     from (SELECT DISTINCT sec_code, sec_abbr FROM DWD_PTFL_POSITION_DETAIL
+           WHERE c_date = '{t}' AND sec_type_l1 = '基金') t1
+     left join (select secu_code, substr(cgstype_l1,3) as cgs_type_l1, substr(cgstype_l2,5) as cgs_type_l2
+     from mf_cgs_type where rpt_date = (select max(rpt_date) from mf_cgs_type where rpt_date <= '{t}')) t2
+     on substr(t1.sec_code, 1,6) = t2.secu_code"
+
+  abs:
+    "select distinct code as sec_code, c_subname_bsh as sec_abbr,
+    '-' as sec_type_l1, '-' as sec_type_l2, 'ABS' as asset_type, 'ABS' as liq_type_l1
+    from dpe_portfoliobond where d_date = '{t}' and windl1type in ('资产支持证券')"
+
+
+rc_lr_asset:
+ securities_holding:
+  "select *
+   from DPE_LR_HOLDING
+   where d_date = '{t}'"
+
+ securities_type:
+  "select sec_code as code, liq_type_l1, liq_type_l2, asset_type
+   from dpe_asset_type
+   where c_date = '{t}'"
+
+ repo_reverse:
+  "select *  from dwd_ptfl_position_repo_o32
+   where c_date = '{t}' and repo_dir = '融券回购' and legal_matu_date > '{t}'"
+
+ basic_info:
+  "select t2.c_fundcode as portfolio_code, t1.c_fundname, t1.\"NetAsset\" as net_asset
+   from rc_style t1
+   left join portfolio_type t2 on t1.C_FULLNAME  = t2.C_FULLNAME
+   where t1.d_date = '{t}' and t1.\"NetAsset\" > 0"
+
+ position:
+  "SELECT t1.PORTFOLIO_CODE, CASE WHEN t1.SEC_TYPE_L1 = '利率互换' THEN t1.SUBCODE ELSE t1.SEC_CODE END AS sec_code,
+   t1.HLD_VOL AS amount, t1.HLD_MV AS asset,
+   CASE WHEN t1.SEC_TYPE_L1 IN ('现金', '存款') THEN '银行存款' WHEN t1.SEC_TYPE_L1 = '互换' THEN '衍生品' ELSE t2.asset_type END AS asset_type,
+   CASE WHEN t1.SEC_TYPE_L1 IN ('现金', '存款') THEN '银行存款' WHEN t1.SEC_TYPE_L1 = '互换' THEN t1.SEC_TYPE_L2 ELSE t2.liq_type_l1 END AS liq_type_l1,
+   CASE WHEN t1.SEC_TYPE_L1 = '现金' THEN '活期存款' when t1.SEC_TYPE_L1 = '存款' THEN '定期存款' ELSE nvl(t2.liq_type_l2, '-') END AS liq_type_l2
+   FROM dwd_ptfl_position_detail t1
+   left join dpe_asset_type t2
+   on t1.c_date = t2.c_date and t1.sec_code = t2.sec_code
+   WHERE t1.c_date = '{t}'
+   AND t1.sec_type_l1 IN ('股票', '可转债', '债券', '同业存单', '证券化资产', '基金', '存款', '现金', '存款', '期货', '信用风险缓释工具', '互换', '远期', '期权', '权证')"
+
+ liq_level_label:
+  "select level_one as asset_type, level_two as liq_type_l1, level_thr as liq_type_l2, liq_level
+   from three_level_dict
+   where type = 'liquidity'"
+
+bond_transaction:
+ dpe_lr_holding:
+  "select * from dpe_lr_holding where d_date = '{t}'"
+
+ ptf_code:
+  "select c_fundcode as portfolio_code, c_fundname from portfolio_type"
+
+ bond_issuer:
+  "select s_info_windcode as bond_code, s_info_compcode as issuer_code
+   from winddb.cbondissuer
+   where s_info_compcode in
+   (select distinct s_info_compcode from winddb.cbondissuer where s_info_windcode in {code})"
+
+ period_transaction:
+  "select trade_dt, s_info_windcode as bond_code, b_dq_volume as volume, b_dq_amount*1000 as value
+   from winddb.cbondprices
+   where trade_dt >= '{t0}' and trade_dt <= '{t1}' and s_info_windcode in {code}"
+
+ bond_info:
+  "select t1.s_info_windcode as bond_code, t1.s_info_exchmarket as bond_mkt, t2.s_info_industryname as windl1type
+   from cbonddescription t1
+   left join cbondindustrywind t2
+   on t1.s_info_windcode = t2.s_info_windcode
+   where t1.s_info_windcode in {code}"
+
+liquidity_score_cnbd:
+ Sql:
+  "select t2.secucode, t2.secumarket, t1.liquidityscore as lqscore_cnbd, t1.liquiditypercentile as lqpct_cnbd
+   from BOND_CBLIQUIDITYLQI t1
+   left join BOND_CODE t2
+   on t1.innercode = t2.innercode
+   where t2.secucode in (%s) and t1.enddate = date'%s'"
+
+rm_threshold_eq:
+ Sql:
+  "SELECT rte.PORTFOLIO_CODE, rte.C_FUNDNAME, to_char(pt.setup_date, 'yyyy-mm-dd') setup_date, rte.BENCHMARK,
+  rte.BENCHMARK_CODE, rte.BENCHMARK_WGT, rte.DMSION, rte.DD_ALERT, rte.RANK_ALERT,
+    rte.RISK_BUDGET, rte.ALERT_PERIOD, rte.ranking_list
+   FROM RM_THRESHOLD_EQ rte
+   left join portfolio_type pt
+   on rte.PORTFOLIO_CODE = pt.C_FUNDCODE"
+
+rc_lr_holders:
+ idc_fundholders_return:
+  "select * from idc_fundholders_return where c_date = '{t}'
+   AND (REDEMPTION_DATE is NULL OR REDEMPTION_DATE = '{t}')
+  "
+
+ idc_fundholders:
+  "SELECT t1.*, t2.nav
+   FROM IDC_FUNDHOLDERS t1
+   LEFT JOIN DPE_PORTFOLIONAV t2
+   ON t1.C_DATE = to_char(t2.d_date, 'YYYY-MM-DD') AND t1.PORTFOLIO_CODE = t2.PORTFOLIO_CODE
+   WHERE t1.c_date = '{t}'"
+
+ org_holders:
+  "SELECT c_date, portfolio_code, full_name, holder_type_l1 as holder_type, holder_type_l2 as shares_type2, sum(holding_shares) as shares
+    FROM DWS_PROD_HOLDERS_BY_ORG
+    WHERE c_date = '{t}'
+    group by c_date, portfolio_code, full_name, holder_type_l1, holder_type_l2"
+
+ class_rule:
+  "SELECT DISTINCT level_two AS class_name,
+   CASE WHEN level_one = '持有期' THEN 'hp_span' WHEN LEVEL_ONE = '持有人类型' THEN 'holder_type' ELSE NULL end AS class_rule
+   FROM THREE_LEVEL_DICT
+   WHERE type = 'liquidity' AND LEVEL_ONE IN ('持有期', '持有人类型')
+   UNION ALL
+   SELECT DISTINCT shares_type2 AS class_name, 'shares_type2' AS class_rule
+   FROM HOLDER_TYPE_MAP
+   WHERE holder_type != '个人'"
+
+ret_adj:
+  Sql: "SELECT distinct to_char(a.d_date, 'yyyy-mm-dd') d_date, b.PORTFOLIO_code, a.c_fundcode, a.c_fundname,
+        a.return
+        FROM DPE_PORTFOLIONAV a
+        join IDC_PORTFOLIOINFO b
+        on a.portfolio_code = b.portfolio_code
+        where to_char(d_date, 'yyyy-mm-dd') >= '{beg_date}'
+        and to_char(d_date, 'yyyy-mm-dd') <= '{end_date}'
+        {field}
+        order by portfolio_code, d_date
+        "
+
+wind_industry_index:
+  Sql: "SELECT s_info_windcode index_code, trade_dt, s_dq_close closeprice, s_dq_pctchange/100 ret
+        FROM WINDDB.AINDEXWINDINDUSTRIESEOD a
+        where a.TRADE_DT between {beg_date}
+        and {end_date} {field}
+         "
+
+internal_port_perf:
+ Sql: "select  a.c_date trade_dt, a.ranking_list, a.return_period, a.portfolio_code, a.c_fundname,
+     a.return, a.return_rankpct, a.max_dd, a.crt_dd, return_rank, a.period_bgdate
+      from RC_MR_PERFORMANCE a
+      where a.c_date between '{beg_date}' and '{end_date}'
+      {field}"
+
+# 转债赎回提示性公告
+cbond_redeem_special_notice:
+ Sql: "SELECT   s.secucode cbond_code, s.SECUABBR cbond_name, bs.INFOPUBLDATE ann_date, bs.NOTICESTARTDATE notice_bg， bs.NOTICEENDDATE notice_end，
+       bs.CONTENT FROM BOND_SPECIALNOTICE bs
+       JOIN SECUMAIN s
+       ON bs.innercode = s.INNERCODE
+       WHERE
+       noticetype = 27
+       {field}
+       ORDER BY NOTICESTARTDATE DESC"
+
+# 转债赎回公告
+cbond_callput_info:
+ Sql: "
+ SELECT s.secucode cbond_code，s.SECUABBR cbond_name，bc.INFOPUBLDATE ann_date， IFOPTION 是否行权，
+ EXEREACHSTARTDATE 触发条件满足区间起始日, EXEREACHENDDATE 触发条件满足区间截止日,
+ STOPEXESTARTDATE 触发不行权区间起始日_原始值, STOPEXEENDDATE 触发不行权区间截止日，TRIGGERRECOUNTDAY 触发条件重新计算日, CALLNOTICEDATE 强制赎回公告日，
+ CALLREGDATE 赎回登记日, OPREMARK 权利描述
+ FROM jydb.BOND_CONBDCALLPUTINFO bc
+ JOIN SECUMAIN s
+ ON bc.innercode = s.INNERCODE
+ WHERE
+ OPTYPESECOND = 10101
+ and opprogress = 2
+  {field}
+ ORDER BY INFOPUBLDATE DESC
+ "
+
+rc_cb_turnover_mean:
+ Sql:
+  "
+  select trade_dt, cbond_windcode, cbond_name, n, method, turnover_mean, volume_mean
+  from rc_cb_turnover_mean
+  where trade_dt between '{beg_date}' and '{end_date}'
+  {field}
+  "
+
+# 转债市场行情信息
+cbond_market_quotation:
+  Sql: "SELECT QT.TradingDay, CI.InnerCode as cbond_innercode , B.SecuCode as cbond_code,
+        B.SecuAbbr as cbond_name, B.SecuMarket as cbond_market,
+        QT.ChangePCT as cbond_pct, QT.ClosePrice as cbond_close
+        FROM JYDB.Bond_ConBDExchangeQuote QT, JYDB.Bond_ConBDBasicInfo CI, JYDB.Bond_Code B
+        WHERE to_char(QT.TradingDay, 'yyyyMMdd') >= {beg_date}
+        and to_char(QT.TradingDay, 'yyyyMMdd') <= {end_date}
+        and QT.BondNature in (1, 4)
+        and QT.InnerCode = CI.InnerCode
+        and B.InnerCode = QT.InnerCode {field}
+        "
+ # -- 可转债外部评级：长期评级、评级体系为国内
+cbond_ratings_external:
+  Sql: "select cr.CRDate, cr.MainCode as cbond_innercode, SECUMAIN.SecuCode as cbond_code, SECUMAIN.secuabbr as cbond_name, SECUMAIN.secumarket as cbond_market,
+         cr.CRAsName, cr.CRCode, cr.CRDesc
+         from JYDB.Bond_BDCreditGrading cr, JYDB.LC_InstiArchive ia, JYDB.SecuMain
+         where cr.CRAsCode = ia.CompanyCode
+         and cr.MainCode = SECUMAIN.innercode
+         and ia.ChiName in ('上海新世纪资信评估投资服务有限公司', '中诚信证评数据科技有限公司', '中证鹏元资信评估股份有限公司',
+         '中国诚信信用管理股份有限公司', '中诚信国际信用评级有限责任公司', '东方金诚国际信用评估有限公司', '联合信用评级有限公司',
+         '联合资信评估股份有限公司', '大公国际资信评估有限公司', '远东资信评估有限公司')
+         and CRTypeCode=2
+         and CRSystem=1
+         and CRStatus=1
+         and SECUMAIN.SecuCategory in (9, 29) {field}"
+
+crwm_protect:
+ Sql: "SELECT C_FULLNAME, CRM_SUBJECTCODE, F_MOUNT AS crm_mount
+       FROM DPE_PORTFOLIOCRMW
+       WHERE d_date = '%s' "
+
+liq_amt_cbond:
+ Sql:
+  "SELECT b.secucode, avg(a.TurnoverVolume) AS avg_vol
+   FROM jydb.Bond_ConBDExchangeQuote a
+   inner join jydb.Bond_Code b
+   on a.innercode = b.innercode
+   where b.secucode in (%s) and a.TradingDay between date'%s' and date'%s'
+   GROUP BY b.secucode"
+
+liq_amount_stock:
+ Sql:
+  "select S.SecuCode, avg(P.TurnoverVolume*10000) as avg_vol
+   from QT_Performance P
+   LEFT JOIN SECUMAIN S
+   ON S.InnerCode = P.InnerCode
+   where S.SecuMarket in ( '83', '90' )
+   and S.ListedSector in ( '1', '2', '6')
+   and s.ListedState in ('1', '9')
+   and S.SecuCategory in ( '1', '41' )
+   and P.TradingDay between date'{t0}' AND date'{t1}'
+   GROUP BY S.SecuCode
+   union
+   select S.SecuCode, avg(P.TurnoverVolume) as avg_vol
+   FROM LC_STIBPerformance P
+   LEFT JOIN SECUMAIN  S
+   on S.InnerCode = P.InnerCode
+   where S.SecuMarket = '83'
+   and S.ListedSector = '7'
+   and S.ListedState in ('1', '9')
+   and S.SecuCategory in ( '1', '41' )
+   and P.TradingDay between date'{t0}' AND date'{t1}'
+   GROUP BY S.SecuCode
+   union
+   select ST.SecuCode, avg(DQ.TurnoverVolume) AS avg_vol
+   FROM QT_HKDailyQuote DQ
+   LEFT join HK_SecuCodeTable st
+   ON ST.InnerCode = DQ.InnerCode
+   where (st.HKSTMark='是' or st.HSIndexMark='是')
+   and st.SecuCategory in ('港股', 'H股', '红筹股', '信托基金')
+   and DQ.TradingDay between date'{t0}' AND date'{t1}'
+   GROUP BY ST.SecuCode"
+
+fund_investment:
+ Sql: "select c_fullname, c_fundname, d_date, fundinvest
+       from rc_style where d_date = '%s'"
+
+
+beg_date:
+ Sql: "SELECT DISTINCT  PERIOD_BGDATE FROM RC_MR_PERFORMANCE WHERE c_DATE = '{t}' AND RETURN_PERIOD = '近一年'"
+
+mf_ret_dd:
+ Sql: "SELECT DISTINCT x.* FROM (SELECT C_DATE ,PORTFOLIO_CODE ,C_FUNDNAME , RETURN, CRT_DD,CRTDD_DURA FROM RC_MR_PERFORMANCE WHERE c_date = '{t}' AND RETURN_period = '近一年') x
+WHERE PORTFOLIO_CODE NOT IN  ('014088.OF','008723.OF','014598.OF','017220.OF')
+UNION SELECT DISTINCT x.* FROM (SELECT C_DATE ,PORTFOLIO_CODE ,C_FUNDNAME , RETURN, CRT_DD,CRTDD_DURA FROM RC_MR_PERFORMANCE WHERE c_date = '{t}' AND RETURN_period = '高楠接手以来') x WHERE PORTFOLIO_CODE = '014088.OF'
+UNION SELECT DISTINCT x.* FROM (SELECT C_DATE ,PORTFOLIO_CODE ,C_FUNDNAME , RETURN, CRT_DD,CRTDD_DURA FROM RC_MR_PERFORMANCE WHERE c_date = '{t}' AND RETURN_period = '成立以来') x WHERE PORTFOLIO_CODE IN ('014598.OF','017220.OF') "
+
+
+mf_ranking_list_dd_mid:
+ Sql: "SELECT A.C_FUNDCODE ,A.C_FULLNAME,B.RANKING_LIST ,B.CRT_DD AS CRTDD_MID FROM QUANT.PORTFOLIO_TYPE A LEFT JOIN MF_RANK_SUMMARY B ON A.RANKING_LIST =B.RANKING_LIST WHERE B.STATISTIC_TYPE = '中位数' AND B.C_DATE = '{t}' AND B.RETURN_PERIOD = '近一年'"
+
+mf_ranking_list_dd_mid_xy:
+ Sql: "WITH ranklist_ret AS (SELECT l.C_DATE,r.C_FUNDCODE,r.C_FULLNAME,l.RANKING_LIST,exp(sum(ln(1+l.DAILY_RETURN)) OVER (PARTITION BY l.RANKING_LIST,r.C_FUNDCODE  ORDER BY l.C_DATE))-1 AS cumret
+FROM MF_RANK_PERFORMANCE_DAILY l RIGHT	JOIN PORTFOLIO_TYPE r ON l.RANKING_LIST = r.RANKING_LIST
+WHERE l.STATISTIC_TYPE = '中位数'
+AND l.C_DATE BETWEEN TO_CHAR(r.SETUP_DATE,'yyyy-mm-dd')  AND '{t}'
+ORDER BY RANKING_LIST
+), rank_dl AS (
+SELECT ranklist_ret.*,MAX(ranklist_ret.cumret) OVER
+(PARTITION BY ranklist_ret.RANKING_LIST,ranklist_ret.C_FUNDCODE
+ORDER BY ranklist_ret.C_DATE
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS maxret FROM ranklist_ret
+),rank_mid AS (
+SELECT rank_dl.*,(1+cumret)/(1+maxret)-1 AS dd  FROM  rank_dl
+)
+SELECT C_FUNDCODE ,C_FULLNAME,RANKING_LIST ,DD AS CRTDD_MID FROM rank_mid
+WHERE C_DATE = '{t}' AND C_FUNDCODE IN ('014598.OF','017220.OF')
+UNION
+SELECT A.C_FUNDCODE ,A.C_FULLNAME,B.RANKING_LIST ,B.CRT_DD AS CRTDD_MID
+FROM QUANT.PORTFOLIO_TYPE A LEFT JOIN MF_RANK_SUMMARY B ON A.RANKING_LIST =B.RANKING_LIST
+WHERE B.STATISTIC_TYPE = '中位数' AND B.C_DATE = '{t}' AND B.RETURN_PERIOD = '近一年'
+AND A.C_FUNDCODE NOT IN ('014598.OF','017220.OF')
+and (END_DATE is NULL OR END_DATE >= DATE '{t}')
+"
+
+mf_cb_ret:
+ Sql: "SELECT C_FUNDCODE,D_DATE,C_FUNDNAME,CBOND_WINDCODE,C_SUBNAME,TWRR,D_RET,W_D_RET_ALL,W_D_RET_ALL_PROD,WEIGHT_PROD  FROM CBA_BS_DETAIL WHERE D_DATE ='{t}'"
+
+mf_cb_dd:
+ Sql: "SELECT c_date,1+RETURN AS nv,portfolio_code,c_fundname FROM ( WITH f AS (SELECT x.*,ROW_NUMBER () OVER (PARTITION BY PORTFOLIO_CODE ORDER BY RETURN DESC ) AS rn FROM (SELECT c_date,PORTFOLIO_CODE ,C_FUNDNAME,avg(RETURN)  as RETURN FROM RC_MR_PERFORMANCE WHERE RETURN_PERIOD = '成立以来' AND c_date >= '{last_t}' AND c_date <= '{t}' group by c_date,portfolio_code,c_fundname) x) SELECT c_date,RETURN,PORTFOLIO_CODE ,C_FUNDNAME FROM f WHERE rn =1  UNION  SELECT c_date,RETURN,PORTFOLIO_CODE ,C_FUNDNAME FROM f WHERE c_date = '{t}')"
+
+mf_cb_ret_past1m:
+ Sql: "SELECT C_FUNDCODE,D_DATE,CBOND_WINDCODE,TWRR,D_RET,W_D_RET_ALL,W_D_RET_ALL_PROD,WEIGHT_PROD  FROM CBA_BS_DETAIL  WHERE D_DATE >= '{last_t}' and D_DATE <= '{t}'"
+
+cb_eq_style:
+ Sql: "SELECT DISTINCT * FROM (SELECT CBOND_WINDCODE,CBOND_NAME,EQUITY_STYLE,TRADINGDAY FROM CBA_CBI_COMP WHERE TRADINGDAY = '{t}')"
+
+cb_idx:
+ Sql: "SELECT s.CHINAME,s.SECUCODE  ,qi.TRADINGDAY,qi.CHANGEPCT  FROM QT_INDEXQUOTE qi INNER JOIN SECUMAIN s ON qi.INNERCODE = s.INNERCODE WHERE s.secucode ='000832' AND TRADINGDAY >= DATE '{t}'"
+
+rm_threshold_cbond:
+ Sql: "SELECT PORTFOLIO_CODE,C_FUNDNAME,CASE WHEN hybrid_type = '低波固收+' THEN 0.015
+       WHEN hybrid_type = '中高波固收+' THEN 0.02
+       WHEN hybrid_type = '平衡型' THEN 0.05 END AS CB_SING_UPPER,0 AS CB_SING_LOWER
+       FROM (SELECT C_FUNDCODE PORTFOLIO_CODE,C_FUNDNAME,CASE WHEN TYPE_L3 IN ('股0.5债9.5','股1债9','股2债8','转债增强') OR TYPE_L2 IN ('一级债基') THEN '低波固收+'
+       WHEN TYPE_L3 IN ('股3债7','股4债6') THEN '中高波固收+'
+       ELSE '平衡型' END  AS hybrid_type ,
+       TYPE_L1,TYPE_L2,TYPE_L3 FROM PORTFOLIO_TYPE pt
+       WHERE TYPE_L0 = '公募' AND
+       TYPE_L1 = '混合型'
+		ORDER BY TYPE_L3 )"
+
+cb_pos_detail:
+ Sql: "SELECT C_DATE,PORTFOLIO_CODE,FULL_NAME,SEC_CODE,SEC_ABBR,MV_NAV_RATIO FROM CDM_PUBLIC.DWD_PTFL_POSITION_DETAIL WHERE SEC_TYPE_L1 = '可转债' AND C_DATE = '{t}'"
+
+cb_begin_dt:
+ Sql: " SELECT a.C_FUNDCODE,a.CBOND_WINDCODE,b.d_date AS begin_date FROM CBA_BS_DETAIL a LEFT JOIN (SELECT C_FUNDCODE,D_DATE,CBOND_WINDCODE,ROW_NUMBER () OVER (PARTITION BY C_FUNDCODE,CBOND_WINDCODE ORDER BY C_FUNDCODE ,CBOND_WINDCODE,D_DATE) AS rn FROM CBA_BS_DETAIL WHERE D_DATE >= '{last_t}' AND d_date<='{t}' 
+) b ON a.C_FUNDCODE =b.c_fundcode AND a.CBOND_WINDCODE =b.cbond_windcode WHERE a.d_date ='{t}' AND b.rn =1"
+ 
+mf_rank_daily:
+ Sql : "SELECT * FROM MF_RANK_PERFORMANCE_DAILY mrpd WHERE STATISTIC_TYPE = '中位数' AND  c_DATE >= '{last_t}' AND  c_DATE <= '{t}' "
+
+mf_basic_info:
+ Sql : "SELECT  C_FUNDCODE AS PORTFOLIO_CODE,MANAGER AS PORTFOLIO_MANAGER,TYPE_L2 AS PORTFOLIO_TYPE  FROM PORTFOLIO_TYPE pt WHERE SETUP_DATE <= DATE '{t}' AND (END_DATE >= DATE'{t}'  OR END_DATE IS NULL )"
+
+mf_basic_info_master:
+ Sql : "SELECT  C_FUNDCODE AS PORTFOLIO_CODE,MANAGER_MASTER AS PORTFOLIO_MANAGER,TYPE_L2 AS PORTFOLIO_TYPE  FROM PORTFOLIO_TYPE pt WHERE SETUP_DATE <= DATE '{t}' AND (END_DATE >= DATE'{t}'  OR END_DATE IS NULL )"
+
+
+cbond_research_conclusion_holds:
+ Sql: "WITH c1 as(
+       SELECT a.C_DATE , a.PORTFOLIO_CODE , a.full_name, a.SEC_CODE , a.SEC_ABBR，a.HLD_MV,  a.MV_NAV_RATIO , b.MONITOR_RISK , b.CB_RATING, b.rating_date
+       FROM dwd_ptfl_position_detail a
+       inner join DWS_CBOND_RESEARCH_CONCLUSION b
+       on a.sec_code=b.sec_code and a.c_date=to_char(TRUNC(to_date(b.c_date, 'yyyy-mm-dd') - 1), 'yyyy-mm-dd')
+       WHERE a.c_date= '{t}'
+       AND b.MONITOR_RISK IN ('三级风险(1)','三级风险(2)','二级风险')
+       )
+      SELECT c1.c_date, c1.portfolio_code, pt.C_FUNDNAME, c1. sec_code , c1.sec_abbr, C1.HLD_MV, c1.mv_nav_ratio, c1.monitor_risk, c1.CB_RATING, c1.rating_date FROM c1 JOIN PORTFOLIO_TYPE pt
+       ON c1.portfolio_code = pt.C_FUNDCODE "
+
+cmt_ptf_info:
+ sql:
+  "SELECT c_fundcode AS portfolio_code,
+   CASE WHEN TYPE_l1 = '货币型' THEN '货币基金' WHEN type_l3 = '同业存单AAA指数' THEN '债券指数'
+   WHEN c_fundname IN ('永赢安泰中短债') THEN '全渠道产品'
+   WHEN c_fundname IN ('永赢迅利中高等级短债', '永赢宏泰短债', '永赢开泰中高等级中短债') THEN '机构产品' ELSE '零售产品' END AS fund_type,
+   MANAGER_MASTER, ranking_list, C_FUNDNAME
+   FROM PORTFOLIO_TYPE WHERE type_l0 = '公募'
+   AND (type_l1 = '货币型' OR type_l2 IN ('短债型', '中短债型') OR type_l3 = '同业存单AAA指数')
+   ORDER BY fund_type"
+
+cmt_size_summary:
+ sql: "select '总计' AS data_type, PORTFOLIO_CODE, net_asset/1e8 AS asset
+      from DWS_PTFL_MAIN_ASSET_SUMY where c_date = '{t}'
+      UNION ALL
+      select '机构' AS data_type, PORTFOLIO_CODE, sum(HOLDING_ASSET)/1e8 as ASSET
+      from DWD_PROD_HOLDERS_SHR_N_TRD where c_date = '{t}' AND holder_type_L1 IN ('机构', '产品')
+      GROUP BY '机构', PORTFOLIO_CODE, full_name
+      UNION ALL
+      SELECT department AS data_type, PORTFOLIO_CODE, sum(HOLDING_ASSET)/1e8 as ASSET
+      FROM DWD_PROD_HOLDERS_SHR_N_TRD WHERE C_DATE = '{t}' AND holder_type_L1 IN ('个人') AND department not IN ('机构部')
+      GROUP BY department, PORTFOLIO_CODE, full_name"
+
+cmt_size_detail:
+ sql:
+  "SELECT PORTFOLIO_CODE, ORG_NAME, HOLDING_ASSET/1e8 AS asset
+   FROM dws_prod_holders_by_org WHERE C_DATE = '{t}' and holder_type_l1 = '个人'"
+
+cmt_size_mkt:
+ sql:
+  "SELECT RANKING_LIST, avg(NET_ASSET)/1e8 AS mkt_size
+   FROM mf_rank_performance
+   WHERE c_date = '{t}' AND RETURN_PERIOD = '近一月'
+   GROUP BY RANKING_LIST "
+
+cmt_risk_indicators:
+ sql:
+  "SELECT t1.C_FUNDNAME, t1.\"avgDuration_port\" AS dur, t2.dur_irlong,
+   t1.\"avgYield_static\" AS ytm, t1.LEVERAGE, t1.\"Lev_cost\" as lev_cost, t3.RATING_LOW
+   FROM RC_MR_HOLDING t1
+   LEFT JOIN
+   (SELECT d_date, C_FUNDNAME, sum(F_ASSETRATIO*\"Duration\")/100 AS dur_irlong
+   FROM DPE_PORTFOLIOBOND WHERE BOND_STYLE = '利率债' AND PTMYEAR >= 4.5
+   GROUP BY d_date, C_FUNDNAME ) t2 ON T1.d_date = T2.d_date AND t1.C_FUNDNAME = t2.c_fundname
+   LEFT JOIN RC_CREDIT t3 ON t1.D_DATE = t3.D_DATE AND t1.C_FUNDNAME = t3.C_FUNDNAME
+   WHERE t1.d_date = '{t}'"
+
+cmt_bm_index:
+ sql:
+  "SELECT C_FUNDCODE AS portfolio_code, BCH_WEALTH_CODE, CRTDD_ONEYEAR, MAXDD_ONEYEAR
+   FROM DPE_INDEXFUND_BCHPF
+   WHERE C_DATE = '{t}'"
+
+cmt_track_dev:
+ sql:
+  "SELECT PORTFOLIO_CODE, A_ANN_DEV
+   FROM RC_MR_INDEX_FUND_MONITOR
+   WHERE c_date = '{t}'"
+
+liq_issuer_size:
+  Sql: "select c_date, issuer, sum(residual_size)/100 as residual_size
+        from cr_bond_spread_foundation
+        where c_date = '{base_date}'
+        and {type_column} = '{type_i}'
+        group by c_date, issuer"
+
+liq_bond_size:
+  Sql: "select c_date, sec_code, residual_size/100 as residual_size
+        from cr_bond_spread_foundation
+        where c_date = '{base_date}'"
+
+liq_ir_bond_size:
+  Sql: "select c_date, sec_code, residual_size
+        from lr_detail_bond
+        where c_date = (select max(c_date) from lr_detail_bond where c_date <= '{base_date}')
+        and {type_column} = '{type_i}'"
+
+lr_bond_detail:
+  Sql: "select * from lr_detail_bond
+        where c_date = (select max(c_date) from lr_detail_bond where c_date <= '{base_date}')"
+
+mgr_assistant_fund:
+ Sql: "select t1.portfolio_code, t2.c_fundname, t1.manager_assistant
+       from dim_prod_basicinfo t1
+       left join portfolio_type t2 on t1.portfolio_code = t2.c_fundcode
+       where c_date = '{t}' and manager_assistant is not null
+       and t2.c_fundname is not null"
+
+mgr_assistant_list:
+ Sql: "select distinct manager_name from dim_mngr_basicinfo
+       where manager_level in ('投资经理助理', '基金经理助理') and employment_status = '在任'"

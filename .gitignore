@@ -1,0 +1,9 @@
+/code/__pycache__
+/code/scripts/__pycache__
+/code/scripts/db/__pycache__
+/code/scripts/db/relation_db/__pycache__
+/code/scripts/trade_dt/__pycache__
+/code/scripts/utils/__pycache__
+/data/
+/logs/
+/.idea/

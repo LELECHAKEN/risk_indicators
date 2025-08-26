@@ -1,0 +1,102 @@
+# logs and data dir path
+Log:
+  path: './logs/'
+
+data:
+  path: './data/'
+
+pkgs_custom:
+  path_1: 'E://RiskQuant//CommonFile//py//CommonFile_py'
+  path_2: 'E://RiskQuant//CommonFile//py//CommonFile_py//LiquidityRisk'
+
+# 公盘路径
+shared_drive_data:
+  product_outline:
+    path: '//shaoafile01/RiskManagement/1. 基础数据/产品一览表.xlsx'
+    sheet: '母公司专户'
+
+  bond_index_component:
+    path: '//shaoafile01/RiskManagement/27. RiskQuant/Data/IndexComponent'
+
+  collateral_file:
+    path: '//shaoafile01/RiskManagement/27. RiskQuant/Data/Collaterals'
+
+  risk_indicator:
+    path: '//shaoafile01/RiskManagement/27. RiskQuant/Data/RiskIndicators'
+
+  risk_indicator_daily:
+    path: '//shaoafile01/RiskManagement/27. RiskQuant/Data/RiskIndicators/日频数据/DailyIndicators/DailyResult'
+
+  static_risk_daily:
+    path: '//shaoafile01/RiskManagement/4. 静态风险监控/4.1 每日静态风险监控'
+
+  liquidity_coef:
+    path: '//shaoafile01/RiskManagement/27. RiskQuant/Data/LiquidityModel'
+
+
+
+# data_base account config
+data_base:
+  JY:
+    url: 'oracle://jydb:jydb@10.198.100.102:1521/JYDB'
+
+  QUANT:
+    url: 'oracle://quant:riskquant9016@10.198.90.37/oadb'
+#    url: 'oracle://risk:risk11111111@10.198.90.37/oadb'
+
+  WIND:
+    url: 'oracle://winddb:winddb@10.198.90.16:1521/oadb'
+
+  REGULATORY:
+    url: 'oracle://regulatory:regulatory11111111@10.198.90.37/oadb'
+
+  Mysql_test:
+    url: 'mysql+pymysql://crds:password@10.198.140.37:26910/xinyong?charset=utf8'
+
+
+# idc_valuation columns name-mapping
+column_map:
+  'FULL_NAME': 'C_FULLNAME'
+  'SUBCODE': 'C_SUBCODE'
+  'SUBNAME': 'C_SUBNAME_BSH'
+  'UNIT_COST': 'F_NETCOST'
+  'STOP_INFO': 'C_STOPINFO'
+  'SEC_CODE': 'code'
+  'SEC_TYPE': 'L_STOCKTYPE'
+  'MKT_TYPE': 'L_SCLB'
+  # 新增
+  'HLD_VOL': 'F_MOUNT'
+  'HLD_COST': 'F_COST'
+  'COST_NAV_RATIO': 'F_COSTRATIO'
+  'UNIT_MV': 'F_PRICE'
+  # 全价市值
+  'HLD_FMV': 'F_ASSET'
+  'FMV_NAV_RATIO': 'F_ASSETRATIO'
+  'SUSP_INFO': 'C_STOPINFO'
+
+sec_type_map:
+  股票: '1'
+  债券: '2'
+  证券化资产: '2'
+  同业存单: '2'
+  可转债: '2'
+  正回购: '3'
+  逆回购: '3'
+  基金: '4'
+  期货: '6'
+  非标资产: '21'
+  信用风险缓释工具: '22'
+
+mkt_map:
+  '上海证券交易所': 1
+  '深圳证券交易所': 2
+  '银行间市场': 3
+  '沪港通': 44
+  '深港通': 30
+  '中国金融期货交易所': 43
+  '香港OTC': 84
+
+# 货基主份额设置
+mmf_share_map:
+  '004545.OF': 'A'
+  '000533.OF': 'E'
